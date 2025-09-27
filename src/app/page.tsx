@@ -20,6 +20,8 @@ import {
   type DatedSentence,
 } from '@/lib/daily-content';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 type DailyContent = {
   dateString: string;
@@ -29,9 +31,11 @@ type DailyContent = {
 function HistoricalEntry({
   entry,
   onSelect,
+  showSentence,
 }: {
   entry: DatedSentence;
   onSelect: (date: Date) => void;
+  showSentence: boolean;
 }) {
   return (
     <div
@@ -47,9 +51,11 @@ function HistoricalEntry({
             timeZone: 'UTC',
           })}
         </span>
-        <p className="text-sm text-muted-foreground">
-          {entry.sentence}
-        </p>
+        {showSentence && (
+          <p className="text-sm text-muted-foreground">
+            {entry.sentence}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -60,6 +66,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [showContent, setShowContent] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [showSpoilers, setShowSpoilers] = useState(true);
   const { toast } = useToast();
   
   const allSentences = useMemo(() => getAllSentences(), []);
@@ -156,6 +163,14 @@ export default function Home() {
           <DialogHeader>
             <DialogTitle>Historical Memories</DialogTitle>
           </DialogHeader>
+          <div className="flex items-center space-x-2 px-1 py-4">
+            <Switch
+              id="spoiler-alert"
+              checked={showSpoilers}
+              onCheckedChange={setShowSpoilers}
+            />
+            <Label htmlFor="spoiler-alert">Spoiler Alert</Label>
+          </div>
           <ScrollArea className="flex-grow">
             <div className="mt-4 flex flex-col gap-2 pr-4">
               {historicalSentences.length > 0 ? (
@@ -164,6 +179,7 @@ export default function Home() {
                     key={entry.date.toISOString()}
                     entry={entry}
                     onSelect={handleHistoricalSelect}
+                    showSentence={showSpoilers}
                   />
                 ))
               ) : (
