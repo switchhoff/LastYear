@@ -191,14 +191,11 @@ export default function Home() {
               {content.dateString}
             </p>
             <h1 className="text-2xl md:text-3xl font-bold text-primary tracking-wider">
-              One year ago today...
+              One year ago today we/you...
             </h1>
           </div>
           <p className="text-2xl md:text-3xl text-foreground/80 max-w-2xl italic">
-            {content.sentence !== "No memory found for this day." 
-              ? `we... "${content.sentence}"`
-              : `"${content.sentence}"`
-            }
+            {`"${content.sentence}"`}
           </p>
         </div>
       ) : (
