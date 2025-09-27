@@ -182,11 +182,11 @@ export default function Home() {
       ) : content ? (
         <div
           className={cn(
-            'flex flex-col items-center justify-center gap-6 opacity-0',
+            'flex flex-col items-center justify-center opacity-0',
             showContent && 'animate-fade-in'
           )}
         >
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-2">
             <p className="text-md md:text-lg text-foreground/80">
               {content.dateString}
             </p>
@@ -194,7 +194,7 @@ export default function Home() {
               One year ago today we/you...
             </h1>
           </div>
-          <blockquote className="relative max-w-2xl">
+          <blockquote className="relative max-w-2xl mt-12">
             <p className="text-2xl md:text-3xl text-primary italic text-balance">
               <span className="absolute -left-4 -top-2 text-6xl text-primary/20 font-serif">“</span>
               {content.sentence}
