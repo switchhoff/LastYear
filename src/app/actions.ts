@@ -4,10 +4,10 @@ import { generateDailyStickFigureArt } from "@/ai/flows/generate-daily-stick-fig
 import { improveArtPromptWithExamples } from "@/ai/flows/improve-art-prompt-with-examples";
 import { getSentenceForDay } from "@/lib/daily-content";
 
-export async function getDailyArt() {
+export async function getDailyArt(forDate?: Date) {
   try {
-    const today = new Date();
-    const sentence = getSentenceForDay(today);
+    const date = forDate || new Date();
+    const sentence = getSentenceForDay(date);
 
     const improvedPromptResult = await improveArtPromptWithExamples({ sentence });
 

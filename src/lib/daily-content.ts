@@ -4,6 +4,11 @@ const dateSentences: { [key: string]: string } = {
   "2024-09-27": "Filmed a Tiktok dance never to see the light of day",
 };
 
+export type DatedSentence = {
+  date: Date;
+  sentence: string;
+};
+
 export function getSentenceForDay(date: Date): string {
   // Format the date as YYYY-MM-DD to match the keys in our map
   const year = date.getFullYear();
@@ -50,4 +55,17 @@ export function getSentenceForDay(date: Date): string {
   const dayOfYear = Math.floor(diff / oneDay);
 
   return fallbackSentences[dayOfYear % fallbackSentences.length];
+}
+
+export function getAllSentences(): DatedSentence[] {
+  return Object.entries(dateSentences)
+    .map(([dateString, sentence]) => {
+      const [year, month, day] = dateString.split('-').map(Number);
+      // Create date in UTC to avoid timezone issues
+      return {
+        date: new Date(Date.UTC(year, month - 1, day)),
+        sentence,
+      };
+    })
+    .sort((a, b) => b.date.getTime() - a.date.getTime());
 }
