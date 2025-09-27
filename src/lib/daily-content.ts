@@ -1,7 +1,7 @@
 
 const dateSentences: { [key: string]: string } = {
-"23/9/2024": "Campfire under the stars",
-"24/9/2024": "Played German Whist for the first time",
+"23/09/2024": "Campfire under the stars",
+"24/09/2024": "Played German Whist for the first time",
 "25/09/2024": "Visited Pink Cliffs and Hang's Tree",
 "26/09/2024": "Helped me cheat PowerPoint animations",
 "27/09/2024": "Filmed a Tiktok dance never to see the light of day",
@@ -374,9 +374,9 @@ export type DatedSentence = {
 };
 
 export function getSentenceForDay(date: Date): string | undefined {
-  // Format the date as D/M/YYYY to match the keys in our map, using UTC
-  const day = date.getUTCDate();
-  const month = date.getUTCMonth() + 1; // getUTCMonth is 0-indexed
+  // Format the date as DD/MM/YYYY to match the keys in our map, using UTC
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // getUTCMonth is 0-indexed
   const year = date.getUTCFullYear();
   const dateString = `${day}/${month}/${year}`;
 
