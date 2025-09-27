@@ -67,8 +67,8 @@ export default function Home() {
       setShowContent(false);
       setContent(null);
 
-      const yearAgo = new Date(date);
-      yearAgo.setFullYear(date.getFullYear() - 1);
+      // We want the memory from one year ago from the passed-in date
+      const yearAgo = new Date(Date.UTC(date.getUTCFullYear() - 1, date.getUTCMonth(), date.getUTCDate()));
       
       const dateString = yearAgo.toLocaleDateString('en-US', {
         year: 'numeric',
@@ -77,7 +77,7 @@ export default function Home() {
         timeZone: 'UTC',
       });
 
-      const result = await getDailyContent(yearAgo); // Use yearAgo date to fetch
+      const result = await getDailyContent(yearAgo);
       if (result.success && result.sentence) {
         setContent({
           dateString,
@@ -100,6 +100,7 @@ export default function Home() {
   };
 
   useEffect(() => {
+    // Fetch content for today's date
     fetchContent(new Date());
   }, []);
 
@@ -123,6 +124,7 @@ export default function Home() {
 
   const handleHistoricalSelect = (date: Date) => {
     setIsSheetOpen(false);
+    // The selected date is from the past. We want to show the memory for the day that is one year *after* it.
     const futureDate = new Date(date);
     futureDate.setFullYear(date.getFullYear() + 1);
     fetchContent(futureDate);
