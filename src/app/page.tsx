@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { History, Save } from 'lucide-react';
+import { History, Save, Eye, EyeOff } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -58,7 +58,7 @@ function HistoricalEntry({
           })}
         </span>
         {showSentence && (
-          <blockquote className="relative mt-1">
+          <blockquote className="relative mt-1 text-balance">
             <p className="text-sm text-muted-foreground italic">
                <span className="absolute -left-3 -top-1 text-4xl text-primary/20 font-serif">“</span>
               {entry.sentence}
@@ -141,6 +141,7 @@ export default function Home() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [spoilerAlert, setSpoilerAlert] = useState(true);
   const [isViewingHistorical, setIsViewingHistorical] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(true);
   const { toast } = useToast();
   
   const allSentences = useMemo(() => getAllSentences(), []);
@@ -242,52 +243,65 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-background text-foreground">
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-6 right-6 h-12 w-12"
-          >
-            <History className="h-8 w-8" />
-            <span className="sr-only">View History</span>
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="h-screen w-screen max-w-full flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Historical Memories</DialogTitle>
-          </DialogHeader>
-          <div className="flex items-center space-x-4 px-1 py-4">
-            <div className='flex items-center space-x-2'>
-              <Switch
-                id="spoiler-alert"
-                checked={spoilerAlert}
-                onCheckedChange={setSpoilerAlert}
-              />
-              <Label htmlFor="spoiler-alert">Spoiler Alert</Label>
+      <div className="absolute top-6 right-6 flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-12 w-12"
+          onClick={() => setShowFeedback(!showFeedback)}
+        >
+          {showFeedback ? <EyeOff className="h-8 w-8" /> : <Eye className="h-8 w-8" />}
+          <span className="sr-only">
+            {showFeedback ? 'Hide feedback section' : 'Show feedback section'}
+          </span>
+        </Button>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-12 w-12"
+            >
+              <History className="h-8 w-8" />
+              <span className="sr-only">View History</span>
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="h-screen w-screen max-w-full flex flex-col">
+            <DialogHeader>
+              <DialogTitle>Historical Memories</DialogTitle>
+            </DialogHeader>
+            <div className="flex items-center space-x-4 px-1 py-4">
+              <div className='flex items-center space-x-2'>
+                <Switch
+                  id="spoiler-alert"
+                  checked={spoilerAlert}
+                  onCheckedChange={setSpoilerAlert}
+                />
+                <Label htmlFor="spoiler-alert">Spoiler Alert</Label>
+              </div>
+              <Button variant="outline" onClick={handleRandomSelect}>Random</Button>
             </div>
-            <Button variant="outline" onClick={handleRandomSelect}>Random</Button>
-          </div>
-          <ScrollArea className="flex-grow">
-            <div className="mt-4 flex flex-col gap-4 pr-4">
-              {historicalSentences.length > 0 ? (
-                historicalSentences.map((entry) => (
-                  <HistoricalEntry
-                    key={entry.date.toISOString()}
-                    entry={entry}
-                    onSelect={handleHistoricalSelect}
-                    showSentence={!spoilerAlert}
-                  />
-                ))
-              ) : (
-                <p className="text-muted-foreground text-center">
-                  No memories found.
-                </p>
-              )}
-            </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
+            <ScrollArea className="flex-grow">
+              <div className="mt-4 flex flex-col gap-4 pr-4">
+                {historicalSentences.length > 0 ? (
+                  historicalSentences.map((entry) => (
+                    <HistoricalEntry
+                      key={entry.date.toISOString()}
+                      entry={entry}
+                      onSelect={handleHistoricalSelect}
+                      showSentence={!spoilerAlert}
+                    />
+                  ))
+                ) : (
+                  <p className="text-muted-foreground text-center">
+                    No memories found.
+                  </p>
+                )}
+              </div>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+      </div>
 
       <div className="flex-grow flex flex-col items-center justify-center w-full">
         {loading ? (
@@ -324,7 +338,7 @@ export default function Home() {
                 <span className="absolute -right-4 -bottom-4 text-6xl text-primary/20 font-serif">”</span>
               </p>
             </blockquote>
-            <FeedbackSection />
+            {showFeedback && <FeedbackSection />}
           </div>
         ) : (
           <div className="flex flex-col items-center gap-4 text-destructive">
@@ -364,5 +378,3 @@ export default function Home() {
     </main>
   );
 }
-
-    
