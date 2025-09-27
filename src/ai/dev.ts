@@ -1,1 +1,5 @@
-// Flows will be imported for their side effects in this file.
+import { config } from 'dotenv';
+config();
+
+import '@/ai/flows/generate-daily-stick-figure-art.ts';
+import '@/ai/flows/improve-art-prompt-with-examples.ts';
