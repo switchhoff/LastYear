@@ -373,11 +373,11 @@ export type DatedSentence = {
   sentence: string;
 };
 
-export function getSentenceForDay(date: Date): string {
-  // Format the date as D/M/YYYY to match the keys in our map
-  const day = date.getDate();
-  const month = date.getMonth() + 1;
-  const year = date.getFullYear();
+export function getSentenceForDay(date: Date): string | undefined {
+  // Format the date as D/M/YYYY to match the keys in our map, using UTC
+  const day = date.getUTCDate();
+  const month = date.getUTCMonth() + 1;
+  const year = date.getUTCFullYear();
   const dateString = `${day}/${month}/${year}`;
 
   // Find the sentence for the given date
@@ -388,37 +388,8 @@ export function getSentenceForDay(date: Date): string {
     return sentence;
   }
 
-  // Fallback sentences if no specific date is matched
-  const fallbackSentences = [
-    "A stick figure celebrating a birthday with a cake.",
-    "Two stick figures playing soccer in a park.",
-    "A stick figure reading a book under a tree.",
-    "A stick figure flying a kite on a windy day.",
-    "Stick figures having a picnic on a sunny afternoon.",
-    "A stick figure artist painting a masterpiece.",
-    "Two stick figures building a sandcastle on the beach.",
-    "A stick figure exploring a mysterious cave.",
-    "Stick figures dancing at a lively party.",
-    "A stick figure astronaut floating in space.",
-    "Two stick figures rowing a boat on a calm lake.",
-    "A stick figure chef cooking a delicious meal.",
-    "Stick figures camping under a starry night sky.",
-    "A stick figure hiking up a tall mountain.",
-    "Two stick figures sharing an umbrella in the rain.",
-    "A stick figure superhero saving the day.",
-    "Stick figures riding a roller coaster at an amusement park.",
-    "A stick figure scientist making a groundbreaking discovery.",
-    "Two stick figures playing a duet on musical instruments.",
-    "A stick figure gardener tending to beautiful flowers."
-  ];
-
-  // Simple fallback: use the day of the year to pick a sentence
-  const start = new Date(date.getFullYear(), 0, 0);
-  const diff = (date.getTime() - start.getTime()) + ((start.getTimezoneOffset() - date.getTimezoneOffset()) * 60 * 1000);
-  const oneDay = 1000 * 60 * 60 * 24;
-  const dayOfYear = Math.floor(diff / oneDay);
-
-  return fallbackSentences[dayOfYear % fallbackSentences.length];
+  // If no sentence is found, return undefined.
+  return undefined;
 }
 
 export function getAllSentences(): DatedSentence[] {

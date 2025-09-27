@@ -83,7 +83,14 @@ export default function Home() {
           sentence: result.sentence,
         });
       } else {
-        throw new Error(result.error || 'Failed to fetch daily content.');
+        // Handle case where no sentence is found for the date
+        setContent({
+          dateString,
+          sentence: "No memory found for this day.",
+        });
+        if (result.error) {
+           throw new Error(result.error);
+        }
       }
     } catch (error) {
       console.error(error);
@@ -91,8 +98,10 @@ export default function Home() {
         variant: 'destructive',
         title: 'Error',
         description:
-          "Could not generate today's memory. Please try again later.",
+          "Could not fetch today's memory. Please try again later.",
       });
+      // Ensure we clear content on error
+      setContent(null);
     } finally {
       setLoading(false);
     }
