@@ -376,20 +376,11 @@ export type DatedSentence = {
 export function getSentenceForDay(date: Date): string | undefined {
   // Format the date as D/M/YYYY to match the keys in our map, using UTC
   const day = date.getUTCDate();
-  const month = date.getUTCMonth() + 1;
+  const month = date.getUTCMonth() + 1; // getUTCMonth is 0-indexed
   const year = date.getUTCFullYear();
   const dateString = `${day}/${month}/${year}`;
 
-  // Find the sentence for the given date
-  const sentence = dateSentences[dateString];
-
-  // If a sentence is found for the specific date, return it
-  if (sentence) {
-    return sentence;
-  }
-
-  // If no sentence is found, return undefined.
-  return undefined;
+  return dateSentences[dateString];
 }
 
 export function getAllSentences(): DatedSentence[] {
@@ -397,7 +388,6 @@ export function getAllSentences(): DatedSentence[] {
     .map(([dateString, sentence]) => {
       const parts = dateString.split('/');
       if (parts.length !== 3) {
-        // Handle potential malformed date strings
         return null;
       }
       const [day, month, year] = parts.map(Number);

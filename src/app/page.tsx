@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -83,7 +84,6 @@ export default function Home() {
           sentence: result.sentence,
         });
       } else {
-        // Handle case where no sentence is found for the date
         setContent({
           dateString,
           sentence: "No memory found for this day.",
@@ -100,7 +100,6 @@ export default function Home() {
         description:
           "Could not fetch today's memory. Please try again later.",
       });
-      // Ensure we clear content on error
       setContent(null);
     } finally {
       setLoading(false);
@@ -108,7 +107,6 @@ export default function Home() {
   };
 
   useEffect(() => {
-    // Get today's date in UTC
     const today = new Date();
     const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
     fetchContent(todayUTC);
@@ -134,8 +132,6 @@ export default function Home() {
 
   const handleHistoricalSelect = (date: Date) => {
     setIsSheetOpen(false);
-    // The selected date is from the past. We want to show the memory for the day that is one year *after* it.
-    // The date from historical entries is already in UTC.
     const futureDate = new Date(date);
     futureDate.setUTCFullYear(date.getUTCFullYear() + 1);
     fetchContent(futureDate);
@@ -199,7 +195,10 @@ export default function Home() {
             </p>
           </div>
           <p className="text-2xl md:text-3xl text-foreground/80 max-w-2xl italic">
-            "{content.sentence}"
+           {content.sentence !== "No memory found for this day." 
+              ? `we... "${content.sentence}"`
+              : `"${content.sentence}"`
+            }
           </p>
         </div>
       ) : (
