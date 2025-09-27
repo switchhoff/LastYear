@@ -191,7 +191,7 @@ export default function Home() {
               {content.dateString}
             </p>
             <h1 className="text-xl md:text-2xl font-bold text-foreground tracking-wider">
-              One year ago today we/you...
+              One year ago today...
             </h1>
           </div>
           <blockquote className="relative max-w-2xl">
