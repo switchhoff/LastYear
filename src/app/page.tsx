@@ -61,7 +61,7 @@ function HistoricalEntry({
         </span>
         {showSentence && (
           <blockquote className="relative mt-1">
-            <p className="text-sm text-muted-foreground italic">
+            <p className="text-sm text-muted-foreground italic text-balance">
                <span className="absolute -left-3 -top-1 text-4xl text-primary/20 font-serif">“</span>
               {entry.sentence}
                <span className="absolute -right-3 -bottom-2 text-4xl text-primary/20 font-serif">”</span>
@@ -86,6 +86,10 @@ function FeedbackSection({ content }: { content: DailyContent }) {
     if (result.success && result.data) {
       setJournalText(result.data.journal || '');
       setSelectedEmoji(result.data.reaction || null);
+    } else {
+      // Reset for new content
+      setJournalText('');
+      setSelectedEmoji(null);
     }
   }, [content.yearAgoDate]);
 
@@ -93,10 +97,17 @@ function FeedbackSection({ content }: { content: DailyContent }) {
     fetchFeedback();
   }, [fetchFeedback]);
 
-  const randomEmojis = useMemo(() => {
+  const displayedEmojis = useMemo(() => {
+    // If an emoji is already selected (from DB), make it the first one.
+    if (selectedEmoji) {
+      const otherEmojis = positiveEmojis.filter((e) => e !== selectedEmoji);
+      const shuffled = otherEmojis.sort(() => 0.5 - Math.random());
+      return [selectedEmoji, ...shuffled.slice(0, 4)];
+    }
+    // Otherwise, show a random selection.
     const shuffled = [...positiveEmojis].sort(() => 0.5 - Math.random());
     return shuffled.slice(0, 5);
-  }, []);
+  }, [selectedEmoji]);
 
   const handleSaveJournal = async () => {
     setIsSaving(true);
@@ -117,6 +128,7 @@ function FeedbackSection({ content }: { content: DailyContent }) {
 
   const handleReact = async (emoji: string) => {
     const newEmoji = selectedEmoji === emoji ? null : emoji;
+    const oldEmoji = selectedEmoji; // Keep old emoji for potential revert
     setSelectedEmoji(newEmoji);
     setIsSaving(true);
     const result = await saveFeedback({
@@ -130,7 +142,7 @@ function FeedbackSection({ content }: { content: DailyContent }) {
     if (!result.success) {
       toast({ variant: "destructive", title: "Error", description: "Could not save your reaction. Please try again." });
       // Revert if save fails
-      setSelectedEmoji(selectedEmoji); 
+      setSelectedEmoji(oldEmoji); 
     }
   };
 
@@ -143,7 +155,7 @@ function FeedbackSection({ content }: { content: DailyContent }) {
         </TabsList>
         <TabsContent value="react">
           <div className="flex justify-center items-center gap-2 p-4">
-            {randomEmojis.map((emoji) => (
+            {displayedEmojis.map((emoji) => (
               <Button
                 key={emoji}
                 variant={selectedEmoji === emoji ? 'default' : 'outline'}
