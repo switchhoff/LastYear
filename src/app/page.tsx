@@ -43,10 +43,10 @@ function HistoricalEntry({
 }) {
   return (
     <div
-      className="flex items-center gap-4 p-2 rounded-md hover:bg-muted cursor-pointer"
+      className="flex items-start gap-4 p-2 rounded-md hover:bg-muted cursor-pointer"
       onClick={() => onSelect(entry.date)}
     >
-      <div className="flex flex-col">
+      <div className="flex flex-col text-left">
         <span className="font-semibold">
           {entry.date.toLocaleDateString('en-GB', {
             year: 'numeric',
@@ -56,9 +56,13 @@ function HistoricalEntry({
           })}
         </span>
         {showSentence && (
-          <p className="text-sm text-muted-foreground text-pretty">
-            {entry.sentence}
-          </p>
+          <blockquote className="relative mt-1">
+            <p className="text-sm text-muted-foreground text-balance italic">
+               <span className="absolute -left-3 -top-1 text-4xl text-primary/20 font-serif">“</span>
+              {entry.sentence}
+               <span className="absolute -right-3 -bottom-2 text-4xl text-primary/20 font-serif">”</span>
+            </p>
+          </blockquote>
         )}
       </div>
     </div>
@@ -200,7 +204,7 @@ export default function Home() {
             <Button variant="outline" onClick={handleRandomSelect}>Random</Button>
           </div>
           <ScrollArea className="flex-grow">
-            <div className="mt-4 flex flex-col gap-2 pr-4">
+            <div className="mt-4 flex flex-col gap-4 pr-4">
               {historicalSentences.length > 0 ? (
                 historicalSentences.map((entry) => (
                   <HistoricalEntry
