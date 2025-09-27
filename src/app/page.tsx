@@ -182,20 +182,20 @@ export default function Home() {
       ) : content ? (
         <div
           className={cn(
-            'flex flex-col items-center justify-center gap-8 opacity-0',
+            'flex flex-col items-center justify-center gap-6 opacity-0',
             showContent && 'animate-fade-in'
           )}
         >
           <div className="flex flex-col gap-2">
-             <h1 className="text-2xl md:text-3xl font-bold text-primary tracking-wider">
-              One year ago today...
-            </h1>
             <p className="text-lg md:text-xl text-foreground/80">
               {content.dateString}
             </p>
+            <h1 className="text-2xl md:text-3xl font-bold text-primary tracking-wider">
+              One year ago today...
+            </h1>
           </div>
           <p className="text-2xl md:text-3xl text-foreground/80 max-w-2xl italic">
-           {content.sentence !== "No memory found for this day." 
+            {content.sentence !== "No memory found for this day." 
               ? `we... "${content.sentence}"`
               : `"${content.sentence}"`
             }
