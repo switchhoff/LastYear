@@ -52,7 +52,7 @@ function HistoricalEntry({
           })}
         </span>
         {showSentence && (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground text-balance">
             {entry.sentence}
           </p>
         )}
@@ -66,7 +66,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [showContent, setShowContent] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [showSpoilers, setShowSpoilers] = useState(true);
+  const [spoilerAlert, setSpoilerAlert] = useState(true);
   const { toast } = useToast();
   
   const allSentences = useMemo(() => getAllSentences(), []);
@@ -166,8 +166,8 @@ export default function Home() {
           <div className="flex items-center space-x-2 px-1 py-4">
             <Switch
               id="spoiler-alert"
-              checked={showSpoilers}
-              onCheckedChange={setShowSpoilers}
+              checked={spoilerAlert}
+              onCheckedChange={setSpoilerAlert}
             />
             <Label htmlFor="spoiler-alert">Spoiler Alert</Label>
           </div>
@@ -179,7 +179,7 @@ export default function Home() {
                     key={entry.date.toISOString()}
                     entry={entry}
                     onSelect={handleHistoricalSelect}
-                    showSentence={showSpoilers}
+                    showSentence={!spoilerAlert}
                   />
                 ))
               ) : (
