@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { History } from 'lucide-react';
+import { History, Save } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +24,8 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 
 type DailyContent = {
   date: Date;
@@ -57,7 +59,7 @@ function HistoricalEntry({
         </span>
         {showSentence && (
           <blockquote className="relative mt-1">
-            <p className="text-sm text-muted-foreground text-balance italic">
+            <p className="text-sm text-muted-foreground italic">
                <span className="absolute -left-3 -top-1 text-4xl text-primary/20 font-serif">“</span>
               {entry.sentence}
                <span className="absolute -right-3 -bottom-2 text-4xl text-primary/20 font-serif">”</span>
@@ -65,6 +67,69 @@ function HistoricalEntry({
           </blockquote>
         )}
       </div>
+    </div>
+  );
+}
+
+const positiveEmojis = ['😊', '❤️', '😂', '😍', '👍', '🥹', '🥰', '🎉', '🤩'];
+
+function FeedbackSection() {
+  const [journalText, setJournalText] = useState('');
+  const [selectedEmoji, setSelectedEmoji] = useState<string | null>(null);
+
+  const randomEmojis = useMemo(() => {
+    const shuffled = [...positiveEmojis].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, 5);
+  }, []);
+
+  const handleSaveJournal = () => {
+    // Placeholder for saving journal text
+    console.log('Saving journal:', journalText);
+  };
+
+  const handleReact = (emoji: string) => {
+    setSelectedEmoji(emoji);
+    // Placeholder for saving emoji reaction
+    console.log('Reacting with:', emoji);
+  };
+
+  return (
+    <div className="w-full max-w-md mt-12 animate-fade-in">
+      <Tabs defaultValue="react" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="react">React Mode</TabsTrigger>
+          <TabsTrigger value="journal">Journal Mode</TabsTrigger>
+        </TabsList>
+        <TabsContent value="react">
+          <div className="flex justify-center items-center gap-2 p-4">
+            {randomEmojis.map((emoji) => (
+              <Button
+                key={emoji}
+                variant={selectedEmoji === emoji ? 'default' : 'outline'}
+                size="icon"
+                className="text-2xl rounded-full h-14 w-14"
+                onClick={() => handleReact(emoji)}
+              >
+                {emoji}
+              </Button>
+            ))}
+          </div>
+        </TabsContent>
+        <TabsContent value="journal">
+          <div className="flex flex-col gap-4 p-4">
+            <Textarea
+              placeholder="Your thoughts on this memory..."
+              value={journalText}
+              onChange={(e) => setJournalText(e.target.value)}
+              className="bg-background"
+            />
+            <Button onClick={handleSaveJournal} className="self-end">
+              <Save className="mr-2 h-4 w-4" />
+              Save
+            </Button>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -224,67 +289,69 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
-      {loading ? (
-        <div className="flex flex-col items-center gap-4">
-          <LoadingSpinner className="h-12 w-12 text-primary" />
-          <p className="text-muted-foreground">Recalling today's memory...</p>
-        </div>
-      ) : content ? (
-        <div
-          className={cn(
-            'flex flex-col items-center justify-center opacity-0',
-            showContent && 'animate-fade-in'
-          )}
-        >
-          <div className="flex flex-col gap-2 mb-24">
-            <div className="flex items-center justify-center gap-2">
-              <p className="text-md md:text-lg text-foreground/80">
-                {content.dateString}
-              </p>
-              {content.memorableDate && (
-                <Badge variant="outline">
-                  {content.memorableDate.emoji} {content.memorableDate.description}
-                </Badge>
-              )}
-            </div>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground tracking-wider">
-              One year ago today...
-            </h1>
+      <div className="flex-grow flex flex-col items-center justify-center w-full">
+        {loading ? (
+          <div className="flex flex-col items-center gap-4">
+            <LoadingSpinner className="h-12 w-12 text-primary" />
+            <p className="text-muted-foreground">Recalling today's memory...</p>
           </div>
-          <blockquote className="relative max-w-2xl">
-            <p className="text-2xl md:text-3xl text-primary italic text-balance">
-              <span className="absolute -left-4 -top-2 text-6xl text-primary/20 font-serif">“</span>
-              {content.sentence}
-              <span className="absolute -right-4 -bottom-4 text-6xl text-primary/20 font-serif">”</span>
-            </p>
-          </blockquote>
-
-        </div>
-      ) : (
-        <div className="flex flex-col items-center gap-4 text-destructive">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="48"
-            height="48"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+        ) : content ? (
+          <div
+            className={cn(
+              'flex flex-col items-center justify-center opacity-0 w-full',
+              showContent && 'animate-fade-in'
+            )}
           >
-            <path d="M6 10H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" />
-            <path d="M6 14H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2h-2" />
-            <path d="M6 6h.01" />
-            <path d="M6 18h.01" />
-            <path d="m13 6-4 6h6l-4 6" />
-          </svg>
-          <h2 className="text-2xl font-semibold">Something went wrong</h2>
-          <p>
-            We couldn't create your memory for today. Please check back later.
-          </p>
-        </div>
-      )}
+            <div className="flex flex-col gap-2 mb-24">
+              <div className="flex items-center justify-center gap-2">
+                <p className="text-md md:text-lg text-foreground/80">
+                  {content.dateString}
+                </p>
+                {content.memorableDate && (
+                  <Badge variant="outline">
+                    {content.memorableDate.emoji} {content.memorableDate.description}
+                  </Badge>
+                )}
+              </div>
+              <h1 className="text-xl md:text-2xl font-bold text-foreground tracking-wider">
+                One year ago today...
+              </h1>
+            </div>
+            <blockquote className="relative max-w-2xl">
+              <p className="text-2xl md:text-3xl text-primary italic text-balance">
+                <span className="absolute -left-4 -top-2 text-6xl text-primary/20 font-serif">“</span>
+                {content.sentence}
+                <span className="absolute -right-4 -bottom-4 text-6xl text-primary/20 font-serif">”</span>
+              </p>
+            </blockquote>
+            <FeedbackSection />
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-4 text-destructive">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="48"
+              height="48"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M6 10H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" />
+              <path d="M6 14H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2h-2" />
+              <path d="M6 6h.01" />
+              <path d="M6 18h.01" />
+              <path d="m13 6-4 6h6l-4 6" />
+            </svg>
+            <h2 className="text-2xl font-semibold">Something went wrong</h2>
+            <p>
+              We couldn't create your memory for today. Please check back later.
+            </p>
+          </div>
+        )}
+      </div>
       {isViewingHistorical && !loading && (
         <Button
           variant="ghost"
@@ -297,3 +364,5 @@ export default function Home() {
     </main>
   );
 }
+
+    
