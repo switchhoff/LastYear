@@ -67,6 +67,7 @@ export default function Home() {
   const [showContent, setShowContent] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [spoilerAlert, setSpoilerAlert] = useState(true);
+  const [isViewingHistorical, setIsViewingHistorical] = useState(false);
   const { toast } = useToast();
   
   const allSentences = useMemo(() => getAllSentences(), []);
@@ -115,10 +116,15 @@ export default function Home() {
     }
   };
 
-  useEffect(() => {
+  const fetchTodaysContent = () => {
     const today = new Date();
     const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
     fetchContent(todayUTC);
+    setIsViewingHistorical(false);
+  }
+
+  useEffect(() => {
+    fetchTodaysContent();
   }, []);
 
   const historicalSentences = useMemo(() => {
@@ -144,6 +150,7 @@ export default function Home() {
     const futureDate = new Date(date);
     futureDate.setUTCFullYear(date.getUTCFullYear() + 1);
     fetchContent(futureDate);
+    setIsViewingHistorical(true);
   };
 
   const handleRandomSelect = () => {
@@ -224,7 +231,7 @@ export default function Home() {
             </h1>
           </div>
           <blockquote className="relative max-w-2xl">
-            <p className="text-2xl md:text-3xl text-primary italic text-balance">
+            <p className="text-2xl md:text-3xl text-primary italic">
               <span className="absolute -left-4 -top-2 text-6xl text-primary/20 font-serif">“</span>
               {content.sentence}
               <span className="absolute -right-4 -bottom-4 text-6xl text-primary/20 font-serif">”</span>
@@ -256,6 +263,15 @@ export default function Home() {
             We couldn't create your memory for today. Please check back later.
           </p>
         </div>
+      )}
+      {isViewingHistorical && !loading && (
+        <Button
+          variant="ghost"
+          onClick={fetchTodaysContent}
+          className="absolute bottom-8 animate-fade-in"
+        >
+          Back to today...
+        </Button>
       )}
     </main>
   );
