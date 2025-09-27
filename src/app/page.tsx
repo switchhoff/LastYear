@@ -190,13 +190,18 @@ export default function Home() {
             <p className="text-lg md:text-xl text-foreground/80">
               {content.dateString}
             </p>
-            <h1 className="text-2xl md:text-3xl font-bold text-primary tracking-wider">
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-wider">
               One year ago today we/you...
             </h1>
           </div>
-          <p className="text-2xl md:text-3xl text-foreground/80 max-w-2xl italic text-balance">
-            {`"${content.sentence}"`}
-          </p>
+          <blockquote className="relative max-w-2xl">
+            <p className="text-2xl md:text-3xl text-primary italic text-balance">
+              <span className="absolute -left-4 -top-2 text-6xl text-foreground/20 font-serif">“</span>
+              {content.sentence}
+              <span className="absolute -right-4 -bottom-4 text-6xl text-foreground/20 font-serif">”</span>
+            </p>
+          </blockquote>
+
         </div>
       ) : (
         <div className="flex flex-col items-center gap-4 text-destructive">
