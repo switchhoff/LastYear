@@ -1,6 +1,7 @@
 
 const dateSentences: { [key: string]: string } = {
   "2024-09-23": "A campfire under the stars.",
+  "2024-09-27": "Filmed a Tiktok dance never to see the light of day",
 };
 
 export function getSentenceForDay(date: Date): string {
