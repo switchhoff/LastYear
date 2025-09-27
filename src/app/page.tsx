@@ -47,7 +47,7 @@ function HistoricalEntry({
             timeZone: 'UTC',
           })}
         </span>
-        <p className="text-sm text-muted-foreground text-balance">"{entry.sentence}"</p>
+        <p className="text-sm text-muted-foreground text-balance">{entry.sentence}</p>
       </div>
     </div>
   );
