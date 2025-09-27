@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { getDailyContent } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/loading-spinner';
@@ -26,9 +26,11 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { saveFeedback, getFeedback, type Feedback } from '@/lib/firebase-service';
 
 type DailyContent = {
   date: Date;
+  yearAgoDate: Date;
   dateString: string;
   sentence: string;
   memorableDate: MemorableDate | undefined;
@@ -58,7 +60,7 @@ function HistoricalEntry({
           })}
         </span>
         {showSentence && (
-          <blockquote className="relative mt-1 text-balance">
+          <blockquote className="relative mt-1">
             <p className="text-sm text-muted-foreground italic">
                <span className="absolute -left-3 -top-1 text-4xl text-primary/20 font-serif">“</span>
               {entry.sentence}
@@ -73,24 +75,63 @@ function HistoricalEntry({
 
 const positiveEmojis = ['😊', '❤️', '😂', '😍', '👍', '🥹', '🥰', '🎉', '🤩'];
 
-function FeedbackSection() {
+function FeedbackSection({ content }: { content: DailyContent }) {
   const [journalText, setJournalText] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
+
+  const fetchFeedback = useCallback(async () => {
+    const result = await getFeedback(content.yearAgoDate);
+    if (result.success && result.data) {
+      setJournalText(result.data.journal || '');
+      setSelectedEmoji(result.data.reaction || null);
+    }
+  }, [content.yearAgoDate]);
+
+  useEffect(() => {
+    fetchFeedback();
+  }, [fetchFeedback]);
 
   const randomEmojis = useMemo(() => {
     const shuffled = [...positiveEmojis].sort(() => 0.5 - Math.random());
     return shuffled.slice(0, 5);
   }, []);
 
-  const handleSaveJournal = () => {
-    // Placeholder for saving journal text
-    console.log('Saving journal:', journalText);
+  const handleSaveJournal = async () => {
+    setIsSaving(true);
+    const result = await saveFeedback({
+      date: content.date,
+      yearAgoDate: content.yearAgoDate,
+      sentence: content.sentence,
+      journal: journalText,
+    });
+    setIsSaving(false);
+    
+    if (result.success) {
+      toast({ title: "Success", description: "Your journal has been saved." });
+    } else {
+      toast({ variant: "destructive", title: "Error", description: "Could not save your journal. Please try again." });
+    }
   };
 
-  const handleReact = (emoji: string) => {
-    setSelectedEmoji(emoji);
-    // Placeholder for saving emoji reaction
-    console.log('Reacting with:', emoji);
+  const handleReact = async (emoji: string) => {
+    const newEmoji = selectedEmoji === emoji ? null : emoji;
+    setSelectedEmoji(newEmoji);
+    setIsSaving(true);
+    const result = await saveFeedback({
+      date: content.date,
+      yearAgoDate: content.yearAgoDate,
+      sentence: content.sentence,
+      reaction: newEmoji ?? '',
+    });
+    setIsSaving(false);
+    
+    if (!result.success) {
+      toast({ variant: "destructive", title: "Error", description: "Could not save your reaction. Please try again." });
+      // Revert if save fails
+      setSelectedEmoji(selectedEmoji); 
+    }
   };
 
   return (
@@ -109,6 +150,7 @@ function FeedbackSection() {
                 size="icon"
                 className="text-2xl rounded-full h-14 w-14"
                 onClick={() => handleReact(emoji)}
+                disabled={isSaving}
               >
                 {emoji}
               </Button>
@@ -122,9 +164,10 @@ function FeedbackSection() {
               value={journalText}
               onChange={(e) => setJournalText(e.target.value)}
               className="bg-background"
+              disabled={isSaving}
             />
-            <Button onClick={handleSaveJournal} className="self-end">
-              <Save className="mr-2 h-4 w-4" />
+            <Button onClick={handleSaveJournal} className="self-end" disabled={isSaving}>
+              {isSaving ? <LoadingSpinner className="mr-2" /> : <Save className="mr-2 h-4 w-4" />}
               Save
             </Button>
           </div>
@@ -167,6 +210,7 @@ export default function Home() {
       if (result.success && result.sentence) {
         setContent({
           date,
+          yearAgoDate: yearAgo,
           dateString,
           sentence: result.sentence,
           memorableDate,
@@ -174,6 +218,7 @@ export default function Home() {
       } else {
         setContent({
           date,
+          yearAgoDate: yearAgo,
           dateString,
           sentence: "No memory found for this day.",
           memorableDate,
@@ -338,7 +383,7 @@ export default function Home() {
                 <span className="absolute -right-4 -bottom-4 text-6xl text-primary/20 font-serif">”</span>
               </p>
             </blockquote>
-            {showFeedback && <FeedbackSection />}
+            {showFeedback && <FeedbackSection content={content} />}
           </div>
         ) : (
           <div className="flex flex-col items-center gap-4 text-destructive">
