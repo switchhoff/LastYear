@@ -40,10 +40,10 @@ function HistoricalEntry({
     >
       <div className="flex flex-col">
         <span className="font-semibold">
-          {entry.date.toLocaleDateString('en-US', {
+          {entry.date.toLocaleDateString('en-GB', {
             year: 'numeric',
-            month: 'long',
-            day: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
             timeZone: 'UTC',
           })}
         </span>
@@ -70,10 +70,10 @@ export default function Home() {
 
       const yearAgo = new Date(Date.UTC(date.getUTCFullYear() - 1, date.getUTCMonth(), date.getUTCDate()));
       
-      const dateString = date.toLocaleDateString('en-US', {
+      const dateString = date.toLocaleDateString('en-GB', {
         year: 'numeric',
-        month: 'long',
-        day: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
         timeZone: 'UTC',
       });
 
