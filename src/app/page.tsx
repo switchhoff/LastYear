@@ -1,13 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
-import { getDailyArt } from '@/app/actions';
+import { getDailyContent } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { History, X } from 'lucide-react';
+import { History } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -17,14 +16,12 @@ import {
 } from '@/components/ui/sheet';
 import {
   getAllSentences,
-  getSentenceForDay,
   type DatedSentence,
 } from '@/lib/daily-content';
 
 type DailyContent = {
   dateString: string;
   sentence: string;
-  imageUrl: string;
 };
 
 function HistoricalEntry({
@@ -34,43 +31,11 @@ function HistoricalEntry({
   entry: DatedSentence;
   onSelect: (date: Date) => void;
 }) {
-  const [image, setImage] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const fetchArt = async () => {
-    setLoading(true);
-    try {
-      const result = await getDailyArt(entry.date);
-      if (result.success && result.imageUrl) {
-        setImage(result.imageUrl);
-      }
-    } catch (e) {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div
       className="flex items-center gap-4 p-2 rounded-md hover:bg-muted cursor-pointer"
       onClick={() => onSelect(entry.date)}
     >
-      <div className="w-16 h-16 bg-muted rounded-md flex-shrink-0 flex items-center justify-center overflow-hidden">
-        {image ? (
-          <Image
-            src={image}
-            alt={entry.sentence}
-            width={64}
-            height={64}
-            className="object-cover"
-          />
-        ) : (
-          <Button variant="ghost" size="sm" onClick={fetchArt} disabled={loading}>
-            {loading ? <LoadingSpinner className="h-4 w-4"/> : 'Load'}
-          </Button>
-        )}
-      </div>
       <div className="flex flex-col">
         <span className="font-semibold">
           {entry.date.toLocaleDateString('en-US', {
@@ -109,12 +74,11 @@ export default function Home() {
         day: 'numeric',
       });
 
-      const result = await getDailyArt(date);
-      if (result.success && result.sentence && result.imageUrl) {
+      const result = await getDailyContent(date);
+      if (result.success && result.sentence) {
         setContent({
           dateString,
           sentence: result.sentence,
-          imageUrl: result.imageUrl,
         });
       } else {
         throw new Error(result.error || 'Failed to fetch daily content.');
@@ -187,7 +151,7 @@ export default function Home() {
       {loading ? (
         <div className="flex flex-col items-center gap-4">
           <LoadingSpinner className="h-12 w-12 text-primary" />
-          <p className="text-muted-foreground">Creating today's memory...</p>
+          <p className="text-muted-foreground">Recalling today's memory...</p>
         </div>
       ) : content ? (
         <div
@@ -204,18 +168,7 @@ export default function Home() {
               {content.dateString}
             </p>
           </div>
-          <div className="relative w-64 h-64 md:w-80 md:h-80 rounded-lg overflow-hidden shadow-2xl shadow-black/30">
-            <Image
-              src={content.imageUrl}
-              alt={content.sentence}
-              fill
-              className="object-contain p-4 bg-gray-900/50"
-              priority
-              sizes="(max-width: 768px) 256px, 320px"
-              data-ai-hint="stick figure"
-            />
-          </div>
-          <p className="text-lg md:text-xl text-foreground/80 max-w-md italic">
+          <p className="text-2xl md:text-3xl text-foreground/80 max-w-2xl italic">
             "{content.sentence}"
           </p>
         </div>
