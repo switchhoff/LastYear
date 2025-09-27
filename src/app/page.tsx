@@ -19,13 +19,17 @@ import {
   getAllSentences,
   type DatedSentence,
 } from '@/lib/daily-content';
+import { getMemorableDate, type MemorableDate } from '@/lib/memorable-dates';
+import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 
 type DailyContent = {
+  date: Date;
   dateString: string;
   sentence: string;
+  memorableDate: MemorableDate | undefined;
 };
 
 function HistoricalEntry({
@@ -52,7 +56,7 @@ function HistoricalEntry({
           })}
         </span>
         {showSentence && (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground text-pretty">
             {entry.sentence}
           </p>
         )}
@@ -86,17 +90,23 @@ export default function Home() {
         day: '2-digit',
         timeZone: 'UTC',
       });
+      
+      const memorableDate = getMemorableDate(date);
 
       const result = await getDailyContent(yearAgo);
       if (result.success && result.sentence) {
         setContent({
+          date,
           dateString,
           sentence: result.sentence,
+          memorableDate,
         });
       } else {
         setContent({
+          date,
           dateString,
           sentence: "No memory found for this day.",
+          memorableDate,
         });
         if (result.error) {
            throw new Error(result.error);
@@ -223,15 +233,22 @@ export default function Home() {
           )}
         >
           <div className="flex flex-col gap-2 mb-24">
-            <p className="text-md md:text-lg text-foreground/80">
-              {content.dateString}
-            </p>
+            <div className="flex items-center justify-center gap-2">
+              <p className="text-md md:text-lg text-foreground/80">
+                {content.dateString}
+              </p>
+              {content.memorableDate && (
+                <Badge variant="outline">
+                  {content.memorableDate.emoji} {content.memorableDate.description}
+                </Badge>
+              )}
+            </div>
             <h1 className="text-xl md:text-2xl font-bold text-foreground tracking-wider">
               One year ago today...
             </h1>
           </div>
           <blockquote className="relative max-w-2xl">
-            <p className="text-2xl md:text-3xl text-primary italic">
+            <p className="text-2xl md:text-3xl text-primary italic text-balance">
               <span className="absolute -left-4 -top-2 text-6xl text-primary/20 font-serif">“</span>
               {content.sentence}
               <span className="absolute -right-4 -bottom-4 text-6xl text-primary/20 font-serif">”</span>
