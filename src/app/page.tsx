@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getDailyContent } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/loading-spinner';
@@ -42,6 +42,7 @@ function HistoricalEntry({
             year: 'numeric',
             month: 'long',
             day: 'numeric',
+            timeZone: 'UTC',
           })}
         </span>
         <p className="text-sm text-muted-foreground">"{entry.sentence}"</p>
@@ -56,9 +57,8 @@ export default function Home() {
   const [showContent, setShowContent] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const { toast } = useToast();
-  const [historicalSentences, setHistoricalSentences] = useState<
-    DatedSentence[]
-  >([]);
+  
+  const allSentences = useMemo(() => getAllSentences(), []);
 
   const fetchContent = async (date: Date) => {
     try {
@@ -74,7 +74,7 @@ export default function Home() {
         day: 'numeric',
       });
 
-      const result = await getDailyContent(date);
+      const result = await getDailyContent(yearAgo); // Use yearAgo date to fetch
       if (result.success && result.sentence) {
         setContent({
           dateString,
@@ -98,8 +98,20 @@ export default function Home() {
 
   useEffect(() => {
     fetchContent(new Date());
-    setHistoricalSentences(getAllSentences());
-  }, [toast]);
+  }, []);
+
+  const historicalSentences = useMemo(() => {
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    oneYearAgo.setHours(0, 0, 0, 0);
+
+    return allSentences.filter(entry => {
+       const entryDate = new Date(entry.date);
+       entryDate.setHours(0,0,0,0);
+       return entryDate <= oneYearAgo;
+    });
+  }, [allSentences]);
+
 
   useEffect(() => {
     if (!loading && content) {
@@ -110,7 +122,9 @@ export default function Home() {
 
   const handleHistoricalSelect = (date: Date) => {
     setIsSheetOpen(false);
-    fetchContent(date);
+    const futureDate = new Date(date);
+    futureDate.setFullYear(date.getFullYear() + 1);
+    fetchContent(futureDate);
   };
 
   return (
