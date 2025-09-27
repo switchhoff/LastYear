@@ -52,7 +52,7 @@ function HistoricalEntry({
           })}
         </span>
         {showSentence && (
-          <p className="text-sm text-muted-foreground text-balance">
+          <p className="text-sm text-muted-foreground">
             {entry.sentence}
           </p>
         )}
@@ -146,6 +146,14 @@ export default function Home() {
     fetchContent(futureDate);
   };
 
+  const handleRandomSelect = () => {
+    if (historicalSentences.length > 0) {
+      const randomIndex = Math.floor(Math.random() * historicalSentences.length);
+      const randomEntry = historicalSentences[randomIndex];
+      handleHistoricalSelect(randomEntry.date);
+    }
+  };
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-background text-foreground">
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -163,13 +171,16 @@ export default function Home() {
           <DialogHeader>
             <DialogTitle>Historical Memories</DialogTitle>
           </DialogHeader>
-          <div className="flex items-center space-x-2 px-1 py-4">
-            <Switch
-              id="spoiler-alert"
-              checked={spoilerAlert}
-              onCheckedChange={setSpoilerAlert}
-            />
-            <Label htmlFor="spoiler-alert">Spoiler Alert</Label>
+          <div className="flex items-center space-x-4 px-1 py-4">
+            <div className='flex items-center space-x-2'>
+              <Switch
+                id="spoiler-alert"
+                checked={spoilerAlert}
+                onCheckedChange={setSpoilerAlert}
+              />
+              <Label htmlFor="spoiler-alert">Spoiler Alert</Label>
+            </div>
+            <Button variant="outline" onClick={handleRandomSelect}>Random</Button>
           </div>
           <ScrollArea className="flex-grow">
             <div className="mt-4 flex flex-col gap-2 pr-4">
