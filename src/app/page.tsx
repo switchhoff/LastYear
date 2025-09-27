@@ -194,7 +194,7 @@ export default function Home() {
               One year ago today we/you...
             </h1>
           </div>
-          <p className="text-2xl md:text-3xl text-foreground/80 max-w-2xl italic">
+          <p className="text-2xl md:text-3xl text-foreground/80 max-w-2xl italic text-balance">
             {`"${content.sentence}"`}
           </p>
         </div>
