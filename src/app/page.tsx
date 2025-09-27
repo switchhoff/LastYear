@@ -9,12 +9,12 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { History } from 'lucide-react';
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import {
   getAllSentences,
   type DatedSentence,
@@ -47,7 +47,9 @@ function HistoricalEntry({
             timeZone: 'UTC',
           })}
         </span>
-        <p className="text-sm text-muted-foreground text-balance">{entry.sentence}</p>
+        <p className="text-sm text-muted-foreground">
+          {entry.sentence}
+        </p>
       </div>
     </div>
   );
@@ -57,7 +59,7 @@ export default function Home() {
   const [content, setContent] = useState<DailyContent | null>(null);
   const [loading, setLoading] = useState(true);
   const [showContent, setShowContent] = useState(false);
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
   
   const allSentences = useMemo(() => getAllSentences(), []);
@@ -131,7 +133,7 @@ export default function Home() {
   }, [loading, content]);
 
   const handleHistoricalSelect = (date: Date) => {
-    setIsSheetOpen(false);
+    setIsDialogOpen(false);
     const futureDate = new Date(date);
     futureDate.setUTCFullYear(date.getUTCFullYear() + 1);
     fetchContent(futureDate);
@@ -139,22 +141,22 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-background text-foreground">
-      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetTrigger asChild>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogTrigger asChild>
           <Button
             variant="ghost"
             size="icon"
-            className="absolute top-6 right-6"
+            className="absolute top-6 right-6 h-12 w-12"
           >
-            <History className="h-6 w-6" />
+            <History className="h-8 w-8" />
             <span className="sr-only">View History</span>
           </Button>
-        </SheetTrigger>
-        <SheetContent>
-          <SheetHeader>
-            <SheetTitle>Historical Memories</SheetTitle>
-          </SheetHeader>
-          <ScrollArea className="h-[calc(100vh-80px)]">
+        </DialogTrigger>
+        <DialogContent className="h-screen w-screen max-w-full flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Historical Memories</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="flex-grow">
             <div className="mt-4 flex flex-col gap-2 pr-4">
               {historicalSentences.length > 0 ? (
                 historicalSentences.map((entry) => (
@@ -171,8 +173,8 @@ export default function Home() {
               )}
             </div>
           </ScrollArea>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
 
       {loading ? (
         <div className="flex flex-col items-center gap-4">
