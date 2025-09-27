@@ -70,7 +70,7 @@ export default function Home() {
 
       const yearAgo = new Date(Date.UTC(date.getUTCFullYear() - 1, date.getUTCMonth(), date.getUTCDate()));
       
-      const dateString = yearAgo.toLocaleDateString('en-US', {
+      const dateString = date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -186,7 +186,7 @@ export default function Home() {
             showContent && 'animate-fade-in'
           )}
         >
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-6">
             <p className="text-md md:text-lg text-foreground/80">
               {content.dateString}
             </p>
