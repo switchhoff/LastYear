@@ -18,6 +18,7 @@ import {
   getAllSentences,
   type DatedSentence,
 } from '@/lib/daily-content';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 type DailyContent = {
   dateString: string;
@@ -68,10 +69,12 @@ export default function Home() {
 
       const yearAgo = new Date(date);
       yearAgo.setFullYear(date.getFullYear() - 1);
+      
       const dateString = yearAgo.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
+        timeZone: 'UTC',
       });
 
       const result = await getDailyContent(yearAgo); // Use yearAgo date to fetch
@@ -101,14 +104,12 @@ export default function Home() {
   }, []);
 
   const historicalSentences = useMemo(() => {
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-    oneYearAgo.setHours(0, 0, 0, 0);
+    const today = new Date();
+    const oneYearAgo = new Date(Date.UTC(today.getUTCFullYear() - 1, today.getUTCMonth(), today.getUTCDate()));
 
     return allSentences.filter(entry => {
        const entryDate = new Date(entry.date);
-       entryDate.setHours(0,0,0,0);
-       return entryDate <= oneYearAgo;
+       return entryDate.getTime() <= oneYearAgo.getTime();
     });
   }, [allSentences]);
 
@@ -144,21 +145,23 @@ export default function Home() {
           <SheetHeader>
             <SheetTitle>Historical Memories</SheetTitle>
           </SheetHeader>
-          <div className="mt-4 flex flex-col gap-2">
-            {historicalSentences.length > 0 ? (
-              historicalSentences.map((entry) => (
-                <HistoricalEntry
-                  key={entry.date.toISOString()}
-                  entry={entry}
-                  onSelect={handleHistoricalSelect}
-                />
-              ))
-            ) : (
-              <p className="text-muted-foreground text-center">
-                No memories found.
-              </p>
-            )}
-          </div>
+          <ScrollArea className="h-[calc(100vh-80px)]">
+            <div className="mt-4 flex flex-col gap-2 pr-4">
+              {historicalSentences.length > 0 ? (
+                historicalSentences.map((entry) => (
+                  <HistoricalEntry
+                    key={entry.date.toISOString()}
+                    entry={entry}
+                    onSelect={handleHistoricalSelect}
+                  />
+                ))
+              ) : (
+                <p className="text-muted-foreground text-center">
+                  No memories found.
+                </p>
+              )}
+            </div>
+          </ScrollArea>
         </SheetContent>
       </Sheet>
 

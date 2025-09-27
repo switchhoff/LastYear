@@ -5,7 +5,9 @@ import { getSentenceForDay } from "@/lib/daily-content";
 export async function getDailyContent(forDate?: Date) {
   try {
     const date = forDate || new Date();
-    const sentence = getSentenceForDay(date);
+    // Ensure we are working with UTC dates to avoid timezone shift issues
+    const utcDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    const sentence = getSentenceForDay(utcDate);
 
     return {
       success: true,
