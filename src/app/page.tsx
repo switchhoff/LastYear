@@ -47,7 +47,7 @@ function HistoricalEntry({
             timeZone: 'UTC',
           })}
         </span>
-        <p className="text-sm text-muted-foreground text-balance">{entry.sentence}</p>
+        <p className="text-sm text-muted-foreground">{entry.sentence}</p>
       </div>
     </div>
   );
@@ -195,7 +195,7 @@ export default function Home() {
             </h1>
           </div>
           <blockquote className="relative max-w-2xl">
-            <p className="text-2xl md:text-3xl text-primary italic text-balance">
+            <p className="text-2xl md:text-3xl text-primary italic">
               <span className="absolute -left-4 -top-2 text-6xl text-primary/20 font-serif">“</span>
               {content.sentence}
               <span className="absolute -right-4 -bottom-4 text-6xl text-primary/20 font-serif">”</span>
