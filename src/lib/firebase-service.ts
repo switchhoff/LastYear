@@ -58,6 +58,7 @@ const ensureMemoryDocExists = (userId: string, memoryDate: Date, sentence: strin
     
     // Create the full Memory object to satisfy schema requirements
     const memoryData = {
+        id: memoryId, // Add the ID to the document data itself
         date: memoryDate.toISOString().split('T')[0], // YYYY-MM-DD format
         sentence: sentence,
         aiArtUrl: "https://picsum.photos/seed/placeholder/600/400", // Placeholder URL
