@@ -23,7 +23,7 @@
     "Memory": {
       "title": "Memory",
       "type": "object",
-      "description": "Represents a memory for a specific date, sentence, and AI generated art.",
+      "description": "Represents a shared memory for a specific date.",
       "properties": {
         "id": {
           "type": "string",
@@ -32,16 +32,12 @@
         "date": {
           "type": "string",
           "format": "date",
-          "description": "The date of the memory (one year prior)."
+          "description": "The date of the memory."
         },
-        "sentence": {
-          "type": "string",
-          "description": "The user-defined sentence associated with the memory."
-        },
-        "aiArtUrl": {
-          "type": "string",
-          "format": "uri",
-          "description": "URL of the AI-generated stick figure art."
+        "userSentences": {
+          "type": "object",
+          "description": "An object mapping user IDs to their sentences for the day.",
+          "properties": {}
         },
         "reactions": {
           "type": "array",
@@ -58,7 +54,21 @@
           }
         }
       },
-      "required": ["id", "date", "sentence", "aiArtUrl"]
+      "required": ["id", "date"]
+    },
+    "UserMemory": {
+      "title": "UserMemory",
+      "type": "object",
+      "description": "Represents a single user's memory for a specific date.",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "sentence": {
+          "type": "string"
+        }
+      },
+      "required": ["userId", "sentence"]
     },
     "UserMemoryReaction": {
       "title": "UserMemoryReaction",
@@ -110,7 +120,11 @@
     },
     "/memories/{memoryId}": {
       "schema": { "$ref": "#/entities/Memory" },
-      "description": "Stores shared memories. Any authenticated user can read and write."
+      "description": "Stores shared memories, reactions, and chats. Any authenticated user can read and write."
+    },
+    "/userMemories/{memoryId}/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserMemory" },
+      "description": "Stores an individual user's sentence for a given memory date."
     }
   }
 }

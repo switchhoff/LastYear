@@ -7,6 +7,7 @@ import {
   arrayUnion,
   writeBatch,
   type Firestore,
+  collection,
 } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
 import type { DatedSentence } from './daily-content';
@@ -23,22 +24,63 @@ export type UserMemoryChatMessage = {
   text: string;
 };
 
+export type UserMemory = {
+  userId: string;
+  sentence: string;
+}
+
 export type Memory = {
     id: string;
     date: string;
-    sentence: string;
-    aiArtUrl: string;
+    userSentences: { [key: string]: string };
     reactions: UserReaction[];
     chatMessages?: UserMemoryChatMessage[];
 }
 
-const getMemoryDocId = (date: Date): string => {
+export const getMemoryDocId = (date: Date): string => {
   const dateObj = new Date(date);
   const day = String(dateObj.getUTCDate()).padStart(2, '0');
   const month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
   const year = dateObj.getUTCFullYear();
   return `${year}-${month}-${day}`;
 };
+
+export async function saveUserSentence(
+  firestore: Firestore,
+  user: User,
+  date: Date,
+  sentence: string
+) {
+  if (!user || !sentence.trim()) return;
+
+  const memoryId = getMemoryDocId(date);
+  const userMemoryRef = doc(firestore, 'userMemories', memoryId, 'users', user.uid);
+  const memoryRef = doc(firestore, 'memories', memoryId);
+
+  const userMemoryData: UserMemory = {
+    userId: user.uid,
+    sentence,
+  };
+  
+  const batch = writeBatch(firestore);
+  batch.set(userMemoryRef, userMemoryData);
+  batch.set(memoryRef, { 
+    id: memoryId,
+    date: date.toISOString().split('T')[0],
+    userSentences: { [user.uid]: sentence }
+  }, { merge: true });
+
+  try {
+    await batch.commit();
+  } catch (error) {
+     const contextualError = new FirestorePermissionError({
+      operation: 'write',
+      path: userMemoryRef.path,
+      requestResourceData: userMemoryData
+    });
+    errorEmitter.emit('permission-error', contextualError);
+  }
+}
 
 export async function saveReaction(
   firestore: Firestore,
@@ -48,7 +90,7 @@ export async function saveReaction(
 ) {
   if (!user) return;
 
-  const memoryId = getMemoryDocId(memoryDate);
+  const memoryId = getMemoryDocId(new Date(memoryDate));
   const memoryRef = doc(firestore, 'memories', memoryId);
 
   try {
@@ -87,7 +129,7 @@ export async function addChatMessage(
 ) {
   if (!user || !text.trim()) return;
 
-  const memoryId = getMemoryDocId(memoryDate);
+  const memoryId = getMemoryDocId(new Date(memoryDate));
   const memoryRef = doc(firestore, 'memories', memoryId);
 
   try {
@@ -124,32 +166,31 @@ export async function ensureMemoryDocuments(firestore: Firestore, allSentences: 
     try {
         const batch = writeBatch(firestore);
         
-        const memoryRefs = allSentences.map(sentence => {
+        for (const sentence of allSentences) {
             const memoryId = getMemoryDocId(sentence.date);
-            return doc(firestore, 'memories', memoryId);
-        });
+            const memoryRef = doc(firestore, 'memories', memoryId);
+            const memorySnap = await getDoc(memoryRef);
 
-        const existingDocsSnapshots = await Promise.all(memoryRefs.map(ref => getDoc(ref)));
-
-        existingDocsSnapshots.forEach((docSnapshot, index) => {
-            if (!docSnapshot.exists()) {
-                const sentence = allSentences[index];
-                const memoryId = getMemoryDocId(sentence.date);
-                const memoryRef = memoryRefs[index];
-                const newMemory: Memory = {
+            if (!memorySnap.exists()) {
+                const newMemory = {
                     id: memoryId,
                     date: sentence.date.toISOString().split('T')[0],
-                    sentence: sentence.sentence,
-                    aiArtUrl: `https://picsum.photos/seed/${memoryId}/600/400`,
+                    userSentences: {
+                      // This is a placeholder, assuming Alex is the author of static content
+                      [ALEX_USER_ID]: sentence.sentence,
+                    },
                     reactions: [],
                     chatMessages: [],
                 };
                 batch.set(memoryRef, newMemory);
             }
-        });
+        }
         
         await batch.commit();
     } catch (error) {
         console.error("Error ensuring memory documents:", error);
     }
 }
+
+// Hardcoded user IDs for legacy data.
+const ALEX_USER_ID = '1xcBSDAluySuyeLwX5TEQnuiPMA2';

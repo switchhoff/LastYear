@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { getDailyContent } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { cn } from '@/lib/utils';
@@ -17,6 +16,8 @@ import {
   MessageSquare,
   RefreshCcw,
   PlusCircle,
+  Pencil,
+  Save,
 } from 'lucide-react';
 import {
   Dialog,
@@ -37,19 +38,23 @@ import {
   saveReaction,
   addChatMessage,
   ensureMemoryDocuments,
+  saveUserSentence,
+  getMemoryDocId,
   type UserReaction,
   type Memory,
   type UserMemoryChatMessage,
 } from '@/lib/firebase-service';
 import { useUser, useAuth, useMemoFirebase, useDoc, useFirestore, useCollection } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { collection, doc, query, collectionGroup } from 'firebase/firestore';
 
 type DailyContent = {
   displayDate: Date;
   memoryDate: Date;
   dateString: string;
-  sentence: string;
+  sentence: string | null; // Sentence can be null if not found
   memorableDate: MemorableDate | undefined;
+  userSentence: string | null;
+  isToday: boolean;
 };
 
 type HistoricalEntryWithReactions = DatedSentence & { reactions: UserReaction[]; chatMessages: UserMemoryChatMessage[] };
@@ -229,28 +234,36 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   }, [firestore]);
 
   const { data: memories, isLoading: memoriesLoading } = useCollection<Memory>(memoriesCollectionRef);
-
+  
   const historicalSentences = useMemo((): HistoricalEntryWithReactions[] => {
-    const memoriesMap = memories ? new Map(memories.map(m => [m.id, m])) : new Map();
-    const today = new Date();
-    const oneYearAgo = new Date(Date.UTC(today.getUTCFullYear() - 1, today.getUTCMonth(), today.getUTCDate()));
+    if (!memories) return [];
+    
+    // We'll use the static sentences as a base and enrich them
+    const staticSentencesMap = new Map(allSentences.map(s => [getMemoryDocId(s.date), s.sentence]));
+    const memoriesMap = new Map(memories.map(m => [m.id, m]));
+    
+    const combinedEntries: HistoricalEntryWithReactions[] = [];
 
-    return allSentences
-      .filter(entry => {
-        const entryDate = new Date(entry.date);
-        return entryDate.getTime() <= oneYearAgo.getTime();
-      })
-      .map(entry => {
-        const memoryId = `${entry.date.getUTCFullYear()}-${String(entry.date.getUTCMonth() + 1).padStart(2, '0')}-${String(entry.date.getUTCDate()).padStart(2, '0')}`;
-        const memory = memoriesMap.get(memoryId);
-        return {
-          ...entry,
-          reactions: memory?.reactions || [],
-          chatMessages: memory?.chatMessages || []
-        };
+    // Prioritize memories from DB, but fall back to static
+    memoriesMap.forEach((memory, id) => {
+      const dateParts = id.split('-').map(Number);
+      const date = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2]));
+
+      // Get sentence from any user in the memory, or fallback to static list
+      const sentence = Object.values(memory.userSentences || {})[0] || staticSentencesMap.get(id) || "No sentence found.";
+      
+      combinedEntries.push({
+        date,
+        sentence,
+        reactions: memory.reactions || [],
+        chatMessages: memory.chatMessages || [],
       });
+    });
+
+    return combinedEntries.sort((a, b) => b.date.getTime() - a.date.getTime());
 
   }, [allSentences, memories]);
+
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -261,6 +274,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     async function setupData() {
         if (!user || !firestore) return;
+        // This can pre-populate memories from the static list if they don't exist
         await ensureMemoryDocuments(firestore, allSentences);
         setDataReady(true);
     }
@@ -291,6 +305,8 @@ export default function Home() {
   );
 }
 
+type MainContentMode = 'view' | 'add';
+
 function MainContent({ historicalSentences }: { historicalSentences: HistoricalEntryWithReactions[] }) {
   const [content, setContent] = useState<DailyContent | null>(null);
   const [loading, setLoading] = useState(true);
@@ -299,6 +315,9 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   const [spoilerAlert, setSpoilerAlert] = useState(true);
   const [isViewingHistorical, setIsViewingHistorical] = useState(false);
   const [showFeedback, setShowFeedback] = useState(true);
+  const [mode, setMode] = useState<MainContentMode>('view');
+  const [newUserSentence, setNewUserSentence] = useState('');
+  
   const { toast } = useToast();
   const { user } = useUser();
   const auth = useAuth();
@@ -308,20 +327,20 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   const [displayedEmojis, setDisplayedEmojis] = useState<string[]>([]);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   
-  const getMemoryDocId = (date: Date): string => {
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const year = date.getUTCFullYear();
-    return `${year}-${month}-${day}`;
-  };
-
   const memoryDocRef = useMemoFirebase(() => {
     if (!firestore || !content) return null;
     const memoryId = getMemoryDocId(content.memoryDate);
     return doc(firestore, 'memories', memoryId);
   }, [firestore, content]);
+  
+  const userMemoryDocRef = useMemoFirebase(() => {
+    if (!firestore || !content || !user) return null;
+    const memoryId = getMemoryDocId(content.memoryDate);
+    return doc(firestore, 'userMemories', memoryId, 'users', user.uid);
+  }, [firestore, content, user]);
 
   const { data: memoryData } = useDoc<Memory>(memoryDocRef);
+  const { data: userMemoryData } = useDoc<{sentence: string}>(userMemoryDocRef);
 
   const reactions = useMemo(() => memoryData?.reactions || [], [memoryData]);
   const userReaction = useMemo(() => {
@@ -330,6 +349,12 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
 
   const alexReaction = useMemo(() => memoryData?.reactions.find(r => r.userId === ALEX_USER_ID)?.reaction, [memoryData]);
   const amalieReaction = useMemo(() => memoryData?.reactions.find(r => r.userId === AMALIE_USER_ID)?.reaction, [memoryData]);
+  
+  const otherUserSentence = useMemo(() => {
+    if (!memoryData?.userSentences || !user) return null;
+    const otherUserId = user.uid === ALEX_USER_ID ? AMALIE_USER_ID : ALEX_USER_ID;
+    return memoryData.userSentences[otherUserId] || null;
+  }, [memoryData, user]);
 
   const generateEmojis = useCallback((currentReaction: string | null, preserveSpot: boolean = false) => {
     const emojiPool = allEmojis.filter(e => e !== currentReaction);
@@ -342,7 +367,6 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
         const currentReactionIndex = displayedEmojis.indexOf(currentReaction);
         if (currentReactionIndex !== -1) {
             const finalEmojis = [...newEmojis];
-            // Ensure the newEmojis don't accidentally contain the current reaction
             newEmojis = newEmojis.filter(e => e !== currentReaction);
             finalEmojis.splice(currentReactionIndex, 0, currentReaction);
             const finalDisplay = finalEmojis.slice(0,5);
@@ -367,7 +391,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   useEffect(() => {
     generateEmojis(userReaction);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [content]);
+  }, [content, userReaction]);
 
   const handleReact = async (emoji: string) => {
     if (!user || !firestore || !content) return;
@@ -375,7 +399,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     const newEmoji = userReaction === emoji ? null : emoji;
     await saveReaction(firestore, user, content.memoryDate, newEmoji);
     setIsSending(false);
-    setIsPopoverOpen(false); // Close popover on selection
+    setIsPopoverOpen(false);
   };
   
   const handleRefreshEmojis = () => {
@@ -389,7 +413,10 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
       setContent(null);
 
       const memoryDate = new Date(Date.UTC(displayDate.getUTCFullYear() - 1, displayDate.getUTCMonth(), displayDate.getUTCDate()));
-      
+      const today = new Date();
+      const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+      const isToday = displayDate.getTime() === todayUTC.getTime();
+
       const dateString = displayDate.toLocaleDateString('en-GB', {
         year: 'numeric',
         month: '2-digit',
@@ -399,34 +426,23 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
       
       const memorableDate = getMemorableDate(displayDate);
 
-      const result = await getDailyContent(memoryDate);
-      if (result.success && result.sentence) {
-        setContent({
-          displayDate,
-          memoryDate,
-          dateString,
-          sentence: result.sentence,
-          memorableDate,
-        });
-      } else {
-        setContent({
-          displayDate,
-          memoryDate,
-          dateString,
-          sentence: "No memory found for this day.",
-          memorableDate,
-        });
-        if (result.error) {
-           throw new Error(result.error);
-        }
-      }
+      // Now we just set up the date info. Sentences are fetched via useDoc.
+      setContent({
+        displayDate,
+        memoryDate,
+        dateString,
+        sentence: null, // This will be filled by the hook
+        memorableDate,
+        userSentence: null,
+        isToday,
+      });
+
     } catch (error) {
       console.error(error);
       toast({
         variant: 'destructive',
         title: 'Error',
-        description:
-          "Could not fetch today's memory. Please try again later.",
+        description: "Could not fetch today's memory. Please try again later.",
       });
       setContent(null);
     } finally {
@@ -439,11 +455,16 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
     fetchContent(todayUTC);
     setIsViewingHistorical(false);
+    setMode('view');
   },[fetchContent]);
 
   useEffect(() => {
     fetchTodaysContent();
   }, [fetchTodaysContent]);
+  
+  useEffect(() => {
+    setNewUserSentence(userMemoryData?.sentence || '');
+  }, [userMemoryData]);
 
   useEffect(() => {
     if (!loading && content) {
@@ -454,6 +475,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
 
   const handleHistoricalSelect = (memoryDate: Date) => {
     setIsDialogOpen(false);
+    setMode('view');
     const displayDate = new Date(memoryDate);
     displayDate.setUTCFullYear(memoryDate.getUTCFullYear() + 1);
     fetchContent(displayDate);
@@ -468,8 +490,40 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     }
   };
 
+  const handleSaveSentence = async () => {
+    if (!user || !firestore || !content || !newUserSentence.trim()) return;
+    setIsSending(true);
+    await saveUserSentence(firestore, user, content.displayDate, newUserSentence);
+    setIsSending(false);
+    setMode('view');
+    toast({ title: "Memory saved!" });
+  };
+  
+  const effectiveSentence = userMemoryData?.sentence || otherUserSentence;
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-background text-foreground">
+       <div className="absolute top-6 left-6 flex items-center gap-2">
+        {content?.isToday && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-12 w-12"
+            onClick={() => {
+              if (mode === 'add') {
+                setMode('view');
+              } else {
+                setMode('add');
+                setNewUserSentence(userMemoryData?.sentence || '');
+              }
+            }}
+          >
+            {mode === 'add' ? <Eye className="h-8 w-8" /> : <Pencil className="h-7 w-7" />}
+            <span className="sr-only">{mode === 'add' ? 'View Memory' : 'Add Memory'}</span>
+          </Button>
+        )}
+      </div>
+
       <div className="absolute top-6 right-6 flex items-center gap-2">
         <Button variant="ghost" size="icon" className="h-12 w-12" onClick={() => auth.signOut()}>
           <LogOut className="h-6 w-6" />
@@ -549,7 +603,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
             <LoadingSpinner className="h-12 w-12 text-primary" />
             <p className="text-muted-foreground">Recalling today's memory...</p>
           </div>
-        ) : content ? (
+        ) : content && mode === 'view' ? (
           <div
             className={cn(
               'flex flex-col items-center justify-center opacity-0 w-full',
@@ -617,14 +671,42 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
                     </Popover>
                 </div>
                 <blockquote className="relative">
-                  <p className="text-2xl md:text-3xl text-primary italic text-balance">
-                    {content.sentence}
-                  </p>
+                  {effectiveSentence ? (
+                    <p className="text-2xl md:text-3xl text-primary italic text-balance">
+                      {effectiveSentence}
+                    </p>
+                  ) : (
+                    <p className="text-lg text-muted-foreground">No memory recorded for one year ago today.</p>
+                  )}
                 </blockquote>
             </div>
 
             {showFeedback && <ChatSection content={content} memoryData={memoryData} />}
           </div>
+        ) : content && mode === 'add' ? (
+           <div className={cn(
+              'flex flex-col items-center justify-center opacity-0 w-full max-w-2xl',
+              showContent && 'animate-fade-in'
+            )}>
+              <div className="flex flex-col gap-2 mb-8 w-full">
+                <p className="text-lg text-foreground/80 text-center">
+                  {new Date().toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+                </p>
+                <h1 className="text-2xl font-bold text-foreground tracking-wider text-center">
+                  What's on your mind today?
+                </h1>
+              </div>
+              <Textarea
+                value={newUserSentence}
+                onChange={(e) => setNewUserSentence(e.target.value)}
+                placeholder="Write your memory for today..."
+                className="w-full min-h-[200px] text-lg p-4"
+              />
+              <Button onClick={handleSaveSentence} disabled={isSending || !newUserSentence.trim()} className="mt-4">
+                {isSending ? <LoadingSpinner className="mr-2"/> : <Save className="mr-2"/>}
+                Save Memory
+              </Button>
+           </div>
         ) : (
           <div className="flex flex-col items-center gap-4 text-destructive">
             <svg
@@ -644,7 +726,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
             </svg>
             <h2 className="text-2xl font-semibold">Something went wrong</h2>
             <p>
-              We couldn't create your memory for today. Please check back later.
+              We couldn't load the memory for today. Please check back later.
             </p>
           </div>
         )}
@@ -660,5 +742,4 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
       )}
     </main>
   );
-
-    
+}
