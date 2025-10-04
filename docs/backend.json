@@ -95,17 +95,17 @@
       "schema": { "$ref": "#/entities/User" },
       "description": "Stores user profiles. The userId must match the authenticated user's UID."
     },
-    "/users/{userId}/memories/{memoryId}": {
+    "/memories/{memoryId}": {
       "schema": { "$ref": "#/entities/Memory" },
-      "description": "Stores memories for each user. The userId must match the authenticated user's UID."
+      "description": "Stores shared memories that any authenticated user can read and write to."
     },
-    "/users/{userId}/memories/{memoryId}/reactions/{reactionUserId}": {
+    "/memories/{memoryId}/reactions/{userId}": {
       "schema": { "$ref": "#/entities/UserMemoryReaction" },
-      "description": "Stores a user's reaction to a memory. The reactionUserId must match the authenticated user's UID."
+      "description": "Stores user reactions to a shared memory. The userId must match the authenticated user's UID."
     },
-    "/users/{userId}/memories/{memoryId}/chat_messages/{messageId}": {
+    "/memories/{memoryId}/chat_messages/{messageId}": {
       "schema": { "$ref": "#/entities/ChatMessage" },
-      "description": "Stores chat messages for a memory. The userId must match the authenticated user's UID."
+      "description": "Stores chat messages for a shared memory. Any authenticated user can read and write."
     }
   }
 }

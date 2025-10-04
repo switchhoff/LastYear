@@ -10,7 +10,6 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   History,
-  Save,
   Eye,
   EyeOff,
   Send,
@@ -35,13 +34,12 @@ import {
   saveReaction,
   addChatMessage,
   getChatMessagesQuery,
+  getMemoryReactionsQuery,
+  getAllMemoryReactions,
   type ChatMessage,
   type UserReaction,
-  getMemoryReactionsForDate,
 } from '@/lib/firebase-service';
-import { useUser, useCollection, useAuth, useMemoFirebase, useFirestore } from '@/firebase';
-import { collection, query, where, getDocs, doc, onSnapshot } from 'firebase/firestore';
-
+import { useUser, useCollection, useAuth, useMemoFirebase } from '@/firebase';
 
 type DailyContent = {
   date: Date;
@@ -103,23 +101,14 @@ function HistoricalEntry({
 
 const positiveEmojis = ['😊', '❤️', '😂', '😍', '👍', '🥹', '🥰', '🎉', '🤩'];
 
-const getMemoryDocId = (date: Date): string => {
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const year = date.getUTCFullYear();
-    return `${year}-${month}-${day}`;
-};
-
 function FeedbackSection({ content }: { content: DailyContent }) {
   const { user } = useUser();
-  const firestore = useFirestore();
   const [isSending, setIsSending] = useState(false);
   
   const memoryReactionsQuery = useMemoFirebase(() => {
-    if (!firestore || !content.yearAgoDate || !user) return null;
-    const memoryId = getMemoryDocId(content.yearAgoDate);
-    return collection(firestore, 'users', user.uid, 'memories', memoryId, 'reactions');
-  }, [firestore, user, content.yearAgoDate]);
+    if (!content.yearAgoDate) return null;
+    return getMemoryReactionsQuery(content.yearAgoDate);
+  }, [content.yearAgoDate]);
 
   const { data: reactionsData } = useCollection<UserReaction>(memoryReactionsQuery);
 
@@ -140,7 +129,6 @@ function FeedbackSection({ content }: { content: DailyContent }) {
   const handleReact = (emoji: string) => {
     if (!user) return;
     const newEmoji = userReaction === emoji ? null : emoji;
-    // Non-blocking update
     saveReaction(user, content.yearAgoDate, content.sentence, newEmoji);
   };
 
@@ -182,11 +170,8 @@ function ChatSection({ content }: { content: DailyContent }) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const messagesQuery = useMemoFirebase(
-    () => {
-        if (!user) return null;
-        return getChatMessagesQuery(user.uid, content.yearAgoDate)
-    },
-    [content.yearAgoDate, user]
+    () => getChatMessagesQuery(content.yearAgoDate),
+    [content.yearAgoDate]
   );
   const { data: messages, isLoading } = useCollection<ChatMessage>(messagesQuery);
   
@@ -281,7 +266,6 @@ export default function Home() {
   const [historicalSentences, setHistoricalSentences] = useState<HistoricalEntryWithReactions[]>([]);
   const { toast } = useToast();
   const auth = useAuth();
-  const { user } = useUser();
   
   const allSentences = useMemo(() => getAllSentences(), []);
 
@@ -348,10 +332,8 @@ export default function Home() {
     fetchTodaysContent();
   }, [fetchTodaysContent]);
 
-
   useEffect(() => {
     async function fetchHistoricalData() {
-        if (!user) return;
         const today = new Date();
         const oneYearAgo = new Date(Date.UTC(today.getUTCFullYear() - 1, today.getUTCMonth(), today.getUTCDate()));
         
@@ -362,14 +344,14 @@ export default function Home() {
 
         const sentencesWithReactions = await Promise.all(
             relevantSentences.map(async (entry) => {
-                const reactions = await getMemoryReactionsForDate(user.uid, entry.date);
+                const reactions = await getAllMemoryReactions(entry.date);
                 return { ...entry, reactions };
             })
         );
         setHistoricalSentences(sentencesWithReactions);
     }
     fetchHistoricalData();
-  }, [allSentences, user]);
+  }, [allSentences]);
 
 
   useEffect(() => {

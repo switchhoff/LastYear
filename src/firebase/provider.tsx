@@ -5,6 +5,7 @@ import { FirebaseApp } from 'firebase/app';
 import { Firestore, doc, setDoc } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
+import { setDocumentNonBlocking } from './non-blocking-updates';
 
 interface FirebaseProviderProps {
   children: ReactNode;
@@ -62,14 +63,11 @@ const updateUserDocument = (firestoreInstance: Firestore, user: User) => {
   // Using setDoc with merge:true is an "upsert" operation.
   // It creates the document if it doesn't exist, or updates it if it does.
   // This won't overwrite existing fields unless they are included in the new data.
-  setDoc(userDocRef, {
+  const userData = {
     id: user.uid,
     email: user.email,
-  }, { merge: true }).catch(error => {
-    // In a real app, you'd want more robust error handling here.
-    // For now, we log it, as the primary functionality might still work.
-    console.error("Error creating/updating user document:", error);
-  });
+  };
+  setDocumentNonBlocking(userDocRef, userData, { merge: true });
 };
 
 

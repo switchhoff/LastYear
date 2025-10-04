@@ -1,18 +1,13 @@
-
 import {
   getFirestore,
   doc,
   setDoc,
-  getDoc,
   getDocs,
   collection,
-  addDoc,
-  Timestamp,
   query,
   orderBy,
   serverTimestamp,
   where,
-  writeBatch,
 } from 'firebase/firestore';
 import {
   setDocumentNonBlocking,
@@ -23,19 +18,11 @@ import type { User } from 'firebase/auth';
 
 const { firestore: db } = initializeFirebase();
 
-export type Feedback = {
-  journal?: string;
-  reaction?: string;
-  date: Date;
-  yearAgoDate: Date;
-  sentence: string;
-};
-
 export type ChatMessage = {
   id: string;
   userId: string;
   text: string;
-  timestamp: Timestamp;
+  timestamp: any; // Allow Timestamp or ServerTimestamp
   userEmail?: string;
 };
 
@@ -52,26 +39,21 @@ const getMemoryDocId = (date: Date): string => {
 };
 
 // Helper to ensure the parent memory document exists before writing to a subcollection.
-const ensureMemoryDocExists = (user: User, memoryDate: Date, sentence: string) => {
-    if (!user) return;
+const ensureMemoryDocExists = (memoryDate: Date, sentence: string) => {
+  const memoryId = getMemoryDocId(memoryDate);
+  const memoryRef = doc(db, 'memories', memoryId);
 
-    // The user document is now created in FirebaseProvider, so we only need to handle the memory doc.
-    const memoryId = getMemoryDocId(memoryDate);
-    const memoryRef = doc(db, 'users', user.uid, 'memories', memoryId);
-    
-    const memoryData = {
-        id: memoryId,
-        date: memoryDate.toISOString().split('T')[0], // YYYY-MM-DD format
-        sentence: sentence,
-        aiArtUrl: "https://picsum.photos/seed/placeholder/600/400", // Placeholder URL
-    };
+  const memoryData = {
+    id: memoryId,
+    date: memoryDate.toISOString().split('T')[0], // YYYY-MM-DD format
+    sentence: sentence,
+    aiArtUrl: "https://picsum.photos/seed/placeholder/600/400", // Placeholder URL
+  };
 
-    // Use a non-blocking set with merge. This will create the doc if it doesn't exist,
-    // or update it if it does. We add `createdAt` only on initial creation.
-    // The security rules should allow this as long as the user document exists.
-    setDocumentNonBlocking(memoryRef, { ...memoryData, createdAt: serverTimestamp() }, { merge: true });
+  // Use a non-blocking set with merge. This will create the doc if it doesn't exist,
+  // or update it if it does, without overwriting fields unnecessarily.
+  setDocumentNonBlocking(memoryRef, memoryData, { merge: true });
 };
-
 
 export function saveReaction(
   user: User,
@@ -81,12 +63,18 @@ export function saveReaction(
 ) {
   if (!user) return;
 
-  // Ensure the parent memory document exists before saving a reaction.
-  ensureMemoryDocExists(user, memoryDate, sentence);
+  ensureMemoryDocExists(memoryDate, sentence);
 
   const memoryId = getMemoryDocId(memoryDate);
-  const reactionRef = doc(db, 'users', user.uid, 'memories', memoryId, 'reactions', user.uid);
-  setDocumentNonBlocking(reactionRef, { userId: user.uid, reaction }, { merge: true });
+  // Each user has their own document in the reactions subcollection, identified by their UID.
+  const reactionRef = doc(db, 'memories', memoryId, 'reactions', user.uid);
+  
+  // If the reaction is null, it means the user is removing their reaction.
+  // We can just set an empty object or a specific field to indicate no reaction.
+  // For simplicity, we'll save the reaction, and null will clear it in the UI logic.
+  const dataToSave = { userId: user.uid, reaction };
+  
+  setDocumentNonBlocking(reactionRef, dataToSave, { merge: true });
 }
 
 export function addChatMessage(
@@ -97,18 +85,11 @@ export function addChatMessage(
 ) {
   if (!user) return;
 
-  // Ensure the parent memory document exists before adding a chat message.
-  ensureMemoryDocExists(user, memoryDate, sentence);
+  ensureMemoryDocExists(memoryDate, sentence);
 
   const memoryId = getMemoryDocId(memoryDate);
-  const chatCollectionRef = collection(
-    db,
-    'users',
-    user.uid,
-    'memories',
-    memoryId,
-    'chat_messages'
-  );
+  const chatCollectionRef = collection(db, 'memories', memoryId, 'chat_messages');
+  
   addDocumentNonBlocking(chatCollectionRef, {
     userId: user.uid,
     userEmail: user.email,
@@ -117,53 +98,36 @@ export function addChatMessage(
   });
 }
 
-export async function getMemoryReactions(
-  userId: string,
+export const getChatMessagesQuery = (memoryDate: Date) => {
+  const memoryId = getMemoryDocId(memoryDate);
+  const chatCollectionRef = collection(db, 'memories', memoryId, 'chat_messages');
+  return query(chatCollectionRef, orderBy('timestamp', 'asc'));
+};
+
+export const getMemoryReactionsQuery = (memoryDate: Date) => {
+  const memoryId = getMemoryDocId(memoryDate);
+  const reactionsRef = collection(db, 'memories', memoryId, 'reactions');
+  // Return the query itself to be used with useCollection
+  return query(reactionsRef, where('reaction', '!=', null));
+};
+
+export async function getAllMemoryReactions(
   memoryDate: Date
-): Promise<{ success: boolean; reactions?: UserReaction[]; error?: string }> {
-  if (!userId) return { success: true, reactions: [] };
+): Promise<UserReaction[]> {
   try {
-    const memoryId = getMemoryDocId(memoryDate);
-    const reactionsRef = collection(db, 'users', userId, 'memories', memoryId, 'reactions');
-    const q = query(reactionsRef, where('reaction', '!=', null));
-    const querySnapshot = await getDocs(q);
+    const reactionsQuery = getMemoryReactionsQuery(memoryDate);
+    const querySnapshot = await getDocs(reactionsQuery);
     const reactions = querySnapshot.docs.map(
       (doc) => doc.data() as UserReaction
     );
-    return { success: true, reactions };
+    return reactions;
   } catch (error) {
     const memoryId = getMemoryDocId(memoryDate);
     const contextualError = new FirestorePermissionError({
       operation: 'list',
-      path: `users/${userId}/memories/${memoryId}/reactions`,
-    })
+      path: `memories/${memoryId}/reactions`,
+    });
     errorEmitter.emit('permission-error', contextualError);
-    return { success: false, error: contextualError.message };
+    return []; // Return empty array on error
   }
 }
-
-export const getChatMessagesQuery = (userId: string, memoryDate: Date) => {
-  if (!userId) return null;
-  const memoryId = getMemoryDocId(memoryDate);
-  const chatCollectionRef = collection(
-    db,
-    'users',
-    userId,
-    'memories',
-    memoryId,
-    'chat_messages'
-  );
-  return query(chatCollectionRef, orderBy('timestamp', 'asc'));
-};
-
-export const getMemoryReactionsForDate = async (
-  userId: string,
-  date: Date
-): Promise<UserReaction[]> => {
-  if (!userId) return [];
-  const result = await getMemoryReactions(userId, date);
-  if (result.success && result.reactions) {
-    return result.reactions;
-  }
-  return [];
-};
