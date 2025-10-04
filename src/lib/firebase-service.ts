@@ -19,6 +19,7 @@ import {
   addDocumentNonBlocking,
 } from '@/firebase/non-blocking-updates';
 import { initializeFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import type { User } from 'firebase/auth';
 
 const { firestore: db } = initializeFirebase();
 
@@ -50,67 +51,71 @@ const getMemoryDocId = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-// Helper to ensure the parent memory document exists before writing a subcollection.
-const ensureMemoryDocExists = (userId: string, memoryDate: Date, sentence: string) => {
-    if (!userId) return;
+// Helper to ensure the parent user and memory documents exist before writing to a subcollection.
+const ensureMemoryDocExists = (user: User, memoryDate: Date, sentence: string) => {
+    if (!user) return;
+
+    // 1. Ensure the user document exists.
+    const userRef = doc(db, 'users', user.uid);
+    // This will create the user doc if it doesn't exist, or do nothing if it does.
+    setDocumentNonBlocking(userRef, { email: user.email }, { merge: true });
+
+    // 2. Ensure the memory document exists.
     const memoryId = getMemoryDocId(memoryDate);
-    const memoryRef = doc(db, 'users', userId, 'memories', memoryId);
+    const memoryRef = doc(db, 'users', user.uid, 'memories', memoryId);
     
-    // Create the full Memory object to satisfy schema requirements
     const memoryData = {
-        id: memoryId, // Add the ID to the document data itself
+        id: memoryId,
         date: memoryDate.toISOString().split('T')[0], // YYYY-MM-DD format
         sentence: sentence,
         aiArtUrl: "https://picsum.photos/seed/placeholder/600/400", // Placeholder URL
     };
 
-    // Use a non-blocking set with merge to create the doc if it doesn't exist,
-    // or update it with the required fields. This now includes createdAt.
+    // Use a non-blocking set with merge to create the doc if it doesn't exist.
+    // Add createdAt only on initial creation.
     setDocumentNonBlocking(memoryRef, { ...memoryData, createdAt: serverTimestamp() }, { merge: true });
 };
 
 
 export function saveReaction(
-  userId: string,
+  user: User,
   memoryDate: Date,
   sentence: string,
   reaction: string | null
 ) {
-  if (!userId) return;
+  if (!user) return;
 
   // Ensure the parent memory document exists before saving a reaction.
-  ensureMemoryDocExists(userId, memoryDate, sentence);
+  ensureMemoryDocExists(user, memoryDate, sentence);
 
   const memoryId = getMemoryDocId(memoryDate);
-  // The reaction document ID is the user's ID to ensure one reaction per user.
-  const reactionRef = doc(db, 'users', userId, 'memories', memoryId, 'reactions', userId);
-  setDocumentNonBlocking(reactionRef, { userId, reaction }, { merge: true });
+  const reactionRef = doc(db, 'users', user.uid, 'memories', memoryId, 'reactions', user.uid);
+  setDocumentNonBlocking(reactionRef, { userId: user.uid, reaction }, { merge: true });
 }
 
 export function addChatMessage(
-  userId:string,
-  userEmail: string,
+  user: User,
   memoryDate: Date,
   sentence: string,
   text: string
 ) {
-  if (!userId) return;
+  if (!user) return;
 
   // Ensure the parent memory document exists before adding a chat message.
-  ensureMemoryDocExists(userId, memoryDate, sentence);
+  ensureMemoryDocExists(user, memoryDate, sentence);
 
   const memoryId = getMemoryDocId(memoryDate);
   const chatCollectionRef = collection(
     db,
     'users',
-    userId,
+    user.uid,
     'memories',
     memoryId,
     'chat_messages'
   );
   addDocumentNonBlocking(chatCollectionRef, {
-    userId,
-    userEmail,
+    userId: user.uid,
+    userEmail: user.email,
     text,
     timestamp: serverTimestamp(),
   });

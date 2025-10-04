@@ -141,7 +141,7 @@ function FeedbackSection({ content }: { content: DailyContent }) {
     if (!user) return;
     const newEmoji = userReaction === emoji ? null : emoji;
     // Non-blocking update
-    saveReaction(user.uid, content.yearAgoDate, content.sentence, newEmoji);
+    saveReaction(user, content.yearAgoDate, content.sentence, newEmoji);
   };
 
   return (
@@ -199,7 +199,7 @@ function ChatSection({ content }: { content: DailyContent }) {
   const handleSendMessage = () => {
     if (!newMessage.trim() || !user) return;
     setIsSending(true);
-    addChatMessage(user.uid, user.email || 'anonymous', content.yearAgoDate, content.sentence, newMessage);
+    addChatMessage(user, content.yearAgoDate, content.sentence, newMessage);
     setNewMessage('');
     setIsSending(false);
   };
