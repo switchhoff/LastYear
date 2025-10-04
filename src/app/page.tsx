@@ -45,8 +45,8 @@ import { useUser, useAuth, useMemoFirebase, useDoc, useFirestore, useCollection 
 import { collection, doc } from 'firebase/firestore';
 
 type DailyContent = {
-  date: Date;
-  yearAgoDate: Date;
+  displayDate: Date;
+  memoryDate: Date;
   dateString: string;
   sentence: string;
   memorableDate: MemorableDate | undefined;
@@ -70,6 +70,9 @@ function HistoricalEntry({
   const amalieReaction = useMemo(() => entry.reactions.find(r => r.userId === AMALIE_USER_ID)?.reaction, [entry.reactions]);
   const chatCount = entry.chatMessages?.length || 0;
 
+  const displayDate = new Date(entry.date);
+  displayDate.setUTCFullYear(displayDate.getUTCFullYear() + 1);
+
   return (
     <div
       className="grid grid-cols-4 items-center gap-4 p-2 rounded-md hover:bg-muted cursor-pointer"
@@ -78,7 +81,7 @@ function HistoricalEntry({
       <div className="flex-grow col-span-1">
         <div className="flex items-center gap-2">
             <span className="font-semibold">
-            {entry.date.toLocaleDateString('en-GB', {
+            {displayDate.toLocaleDateString('en-GB', {
                 year: 'numeric',
                 month: '2-digit',
                 day: '2-digit',
@@ -154,7 +157,7 @@ function ChatSection({ content, memoryData }: { content: DailyContent, memoryDat
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !user || !firestore) return;
     setIsSending(true);
-    await addChatMessage(firestore, user, content.yearAgoDate, newMessage);
+    await addChatMessage(firestore, user, content.memoryDate, newMessage);
     setNewMessage('');
     setIsSending(false);
   };
@@ -228,9 +231,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   const { data: memories, isLoading: memoriesLoading } = useCollection<Memory>(memoriesCollectionRef);
 
   const historicalSentences = useMemo((): HistoricalEntryWithReactions[] => {
-    if (!memories) return [];
-
-    const memoriesMap = new Map(memories.map(m => [m.id, m]));
+    const memoriesMap = memories ? new Map(memories.map(m => [m.id, m])) : new Map();
     const today = new Date();
     const oneYearAgo = new Date(Date.UTC(today.getUTCFullYear() - 1, today.getUTCMonth(), today.getUTCDate()));
 
@@ -306,8 +307,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   const [isSending, setIsSending] = useState(false);
   const [displayedEmojis, setDisplayedEmojis] = useState<string[]>([]);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
-
-
+  
   const getMemoryDocId = (date: Date): string => {
     const day = String(date.getUTCDate()).padStart(2, '0');
     const month = String(date.getUTCMonth() + 1).padStart(2, '0');
@@ -317,7 +317,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
 
   const memoryDocRef = useMemoFirebase(() => {
     if (!firestore || !content) return null;
-    const memoryId = getMemoryDocId(content.yearAgoDate);
+    const memoryId = getMemoryDocId(content.memoryDate);
     return doc(firestore, 'memories', memoryId);
   }, [firestore, content]);
 
@@ -336,20 +336,22 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     const shuffled = [...emojiPool].sort(() => 0.5 - Math.random());
     
     const emojisToPick = preserveSpot && currentReaction ? 4 : 5;
-    const newEmojis = shuffled.slice(0, emojisToPick);
+    let newEmojis = shuffled.slice(0, emojisToPick);
 
     if (preserveSpot && currentReaction) {
         const currentReactionIndex = displayedEmojis.indexOf(currentReaction);
         if (currentReactionIndex !== -1) {
             const finalEmojis = [...newEmojis];
+            // Ensure the newEmojis don't accidentally contain the current reaction
+            newEmojis = newEmojis.filter(e => e !== currentReaction);
             finalEmojis.splice(currentReactionIndex, 0, currentReaction);
             const finalDisplay = finalEmojis.slice(0,5);
-            if(!finalDisplay.includes(currentReaction)) {
+             if(!finalDisplay.includes(currentReaction)) {
               finalDisplay[currentReactionIndex] = currentReaction;
             }
             setDisplayedEmojis(finalDisplay);
         } else {
-            if (!newEmojis.includes(currentReaction)) {
+             if (!newEmojis.includes(currentReaction)) {
               newEmojis[Math.floor(Math.random() * newEmojis.length)] = currentReaction;
             }
             setDisplayedEmojis(newEmojis);
@@ -371,7 +373,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     if (!user || !firestore || !content) return;
     setIsSending(true);
     const newEmoji = userReaction === emoji ? null : emoji;
-    await saveReaction(firestore, user, content.yearAgoDate, newEmoji);
+    await saveReaction(firestore, user, content.memoryDate, newEmoji);
     setIsSending(false);
     setIsPopoverOpen(false); // Close popover on selection
   };
@@ -380,36 +382,36 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     generateEmojis(userReaction, true);
   }
 
-  const fetchContent = useCallback(async (date: Date) => {
+  const fetchContent = useCallback(async (displayDate: Date) => {
     try {
       setLoading(true);
       setShowContent(false);
       setContent(null);
 
-      const yearAgo = new Date(Date.UTC(date.getUTCFullYear() - 1, date.getUTCMonth(), date.getUTCDate()));
+      const memoryDate = new Date(Date.UTC(displayDate.getUTCFullYear() - 1, displayDate.getUTCMonth(), displayDate.getUTCDate()));
       
-      const dateString = date.toLocaleDateString('en-GB', {
+      const dateString = displayDate.toLocaleDateString('en-GB', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
         timeZone: 'UTC',
       });
       
-      const memorableDate = getMemorableDate(date);
+      const memorableDate = getMemorableDate(displayDate);
 
-      const result = await getDailyContent(yearAgo);
+      const result = await getDailyContent(memoryDate);
       if (result.success && result.sentence) {
         setContent({
-          date,
-          yearAgoDate: yearAgo,
+          displayDate,
+          memoryDate,
           dateString,
           sentence: result.sentence,
           memorableDate,
         });
       } else {
         setContent({
-          date,
-          yearAgoDate: yearAgo,
+          displayDate,
+          memoryDate,
           dateString,
           sentence: "No memory found for this day.",
           memorableDate,
@@ -450,11 +452,11 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     }
   }, [loading, content]);
 
-  const handleHistoricalSelect = (date: Date) => {
+  const handleHistoricalSelect = (memoryDate: Date) => {
     setIsDialogOpen(false);
-    const futureDate = new Date(date);
-    futureDate.setUTCFullYear(date.getUTCFullYear() + 1);
-    fetchContent(futureDate);
+    const displayDate = new Date(memoryDate);
+    displayDate.setUTCFullYear(memoryDate.getUTCFullYear() + 1);
+    fetchContent(displayDate);
     setIsViewingHistorical(true);
   };
 

@@ -5,12 +5,15 @@ import { getSentenceForDay } from "@/lib/daily-content";
 export async function getDailyContent(forDate?: Date) {
   try {
     const date = forDate || new Date();
-    // We are getting a date for "one year ago". We need to find the sentence for this specific date.
-    // The getSentenceForDay function expects a UTC date to perform the lookup.
+    // This function expects the memory date (one year ago) to perform the lookup.
     const sentence = getSentenceForDay(date);
 
     if (!sentence) {
-      throw new Error(`No sentence found for date: ${date.toISOString()}`);
+      // It's okay for a sentence not to be found, we'll handle it gracefully.
+      return {
+        success: true,
+        sentence: null,
+      };
     }
 
     return {
