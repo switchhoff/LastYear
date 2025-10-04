@@ -1,11 +1,24 @@
-import { app } from './firebase';
 import {
   getFirestore,
   doc,
   setDoc,
   getDoc,
+  getDocs,
+  collection,
+  addDoc,
   Timestamp,
+  query,
+  orderBy,
+  serverTimestamp,
+  where,
 } from 'firebase/firestore';
+import {
+  setDocumentNonBlocking,
+  addDocumentNonBlocking,
+} from '@/firebase/non-blocking-updates';
+import { initializeFirebase } from '@/firebase';
+
+const { firestore: db } = initializeFirebase();
 
 export type Feedback = {
   journal?: string;
@@ -15,43 +28,38 @@ export type Feedback = {
   sentence: string;
 };
 
-const db = getFirestore(app);
+export type ChatMessage = {
+  id: string;
+  userId: string;
+  text: string;
+  timestamp: Timestamp;
+  userEmail?: string;
+};
 
-// We use the date of the memory (the "year ago" date) as the unique ID for the document.
-const getDocIdForDate = (date: Date): string => {
+export type UserReaction = {
+  userId: string;
+  reaction: string;
+};
+
+const getMemoryDocId = (date: Date): string => {
   const day = String(date.getUTCDate()).padStart(2, '0');
   const month = String(date.getUTCMonth() + 1).padStart(2, '0');
   const year = date.getUTCFullYear();
   return `${year}-${month}-${day}`;
 };
 
-export async function saveFeedback(feedback: {
-  date: Date; // The date the user is viewing (e.g., today)
-  yearAgoDate: Date; // The date of the memory
-  sentence: string;
-  journal?: string;
-  reaction?: string;
-}) {
+export async function saveReaction(
+  userId: string,
+  memoryDate: Date,
+  reaction: string | null
+) {
   try {
-    const docId = getDocIdForDate(feedback.yearAgoDate);
-    const docRef = doc(db, 'memories', docId);
-
-    // We use setDoc with merge: true to create or update the document
-    // without overwriting existing fields we don't want to change.
-    await setDoc(
-      docRef,
-      {
-        date: Timestamp.fromDate(feedback.date),
-        yearAgoDate: Timestamp.fromDate(feedback.yearAgoDate),
-        sentence: feedback.sentence,
-        ...(feedback.journal !== undefined && { journal: feedback.journal }),
-        ...(feedback.reaction !== undefined && { reaction: feedback.reaction }),
-      },
-      { merge: true }
-    );
+    const memoryId = getMemoryDocId(memoryDate);
+    const reactionRef = doc(db, 'memories', memoryId, 'reactions', userId);
+    setDocumentNonBlocking(reactionRef, { userId, reaction }, { merge: true });
     return { success: true };
   } catch (error) {
-    console.error('Error saving feedback:', error);
+    console.error('Error saving reaction:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'An unknown error occurred.',
@@ -59,36 +67,71 @@ export async function saveFeedback(feedback: {
   }
 }
 
-export async function getFeedback(
-  yearAgoDate: Date
-): Promise<{ success: boolean; data?: Feedback; error?: string }> {
+export async function addChatMessage(
+  userId: string,
+  userEmail: string,
+  memoryDate: Date,
+  text: string
+) {
   try {
-    const docId = getDocIdForDate(yearAgoDate);
-    const docRef = doc(db, 'memories', docId);
-    const docSnap = await getDoc(docRef);
-
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      return {
-        success: true,
-        data: {
-          journal: data.journal,
-          reaction: data.reaction,
-          // Convert Firestore Timestamps back to JS Dates
-          date: (data.date as Timestamp).toDate(),
-          yearAgoDate: (data.yearAgoDate as Timestamp).toDate(),
-          sentence: data.sentence,
-        },
-      };
-    } else {
-      return { success: true, data: undefined }; // No feedback found is not an error
-    }
+    const memoryId = getMemoryDocId(memoryDate);
+    const chatCollectionRef = collection(
+      db,
+      'memories',
+      memoryId,
+      'chat_messages'
+    );
+    addDocumentNonBlocking(chatCollectionRef, {
+      userId,
+      userEmail,
+      text,
+      timestamp: serverTimestamp(),
+    });
+    return { success: true };
   } catch (error) {
-    console.error('Error fetching feedback:', error);
+    console.error('Error adding chat message:', error);
     return {
       success: false,
-      error:
-        error instanceof Error ? error.message : 'An unknown error occurred.',
+      error: error instanceof Error ? error.message : 'An unknown error occurred.',
     };
   }
 }
+
+export async function getMemoryReactions(
+  memoryDate: Date
+): Promise<{ success: boolean; reactions?: UserReaction[]; error?: string }> {
+  try {
+    const memoryId = getMemoryDocId(memoryDate);
+    const reactionsRef = collection(db, 'memories', memoryId, 'reactions');
+    const q = query(reactionsRef, where('reaction', '!=', null));
+    const querySnapshot = await getDocs(q);
+    const reactions = querySnapshot.docs.map(
+      (doc) => doc.data() as UserReaction
+    );
+    return { success: true, reactions };
+  } catch (error) {
+    console.error('Error getting reactions:', error);
+    return { success: false, error: 'Could not fetch reactions.' };
+  }
+}
+
+export const getChatMessagesQuery = (memoryDate: Date) => {
+  const memoryId = getMemoryDocId(memoryDate);
+  const chatCollectionRef = collection(
+    db,
+    'memories',
+    memoryId,
+    'chat_messages'
+  );
+  return query(chatCollectionRef, orderBy('timestamp', 'asc'));
+};
+
+export const getMemoryReactionsForDate = async (
+  date: Date
+): Promise<UserReaction[]> => {
+  const result = await getMemoryReactions(date);
+  if (result.success && result.reactions) {
+    return result.reactions;
+  }
+  return [];
+};
