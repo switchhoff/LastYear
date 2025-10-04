@@ -33,14 +33,14 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   saveReaction,
   addChatMessage,
-  getAllMemoryReactions,
   getMemoryDocRef,
   ensureMemoryDocuments,
   type UserReaction,
   type Memory,
   type UserMemoryChatMessage,
 } from '@/lib/firebase-service';
-import { useUser, useAuth, useMemoFirebase, useDoc, useFirestore } from '@/firebase';
+import { useUser, useAuth, useMemoFirebase, useDoc, useFirestore, useCollection } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
 type DailyContent = {
   date: Date;
@@ -66,35 +66,34 @@ function HistoricalEntry({
       className="flex items-start justify-between gap-4 p-2 rounded-md hover:bg-muted cursor-pointer"
       onClick={() => onSelect(entry.date)}
     >
-      <div className="flex flex-col text-left">
-        <span className="font-semibold">
-          {entry.date.toLocaleDateString('en-GB', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            timeZone: 'UTC',
-          })}
-        </span>
+      <div className="flex-grow">
+        <div className="flex items-center gap-2">
+            <span className="font-semibold">
+            {entry.date.toLocaleDateString('en-GB', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                timeZone: 'UTC',
+            })}
+            </span>
+            <div className="flex-shrink-0 flex items-center gap-1">
+                {entry.reactions.map((r, index) => (
+                <span key={index} className="text-lg">
+                    {r.reaction}
+                </span>
+                ))}
+            </div>
+        </div>
         {showSentence && (
-          <blockquote className="relative mt-1">
+          <blockquote className="relative mt-1 pl-3">
             <p className="text-sm text-muted-foreground italic text-balance">
-              <span className="absolute -left-3 -top-1 text-4xl text-primary/20 font-serif">
+              <span className="absolute -left-0 -top-1 text-4xl text-primary/20 font-serif">
                 “
               </span>
               {entry.sentence}
-              <span className="absolute -right-3 -bottom-2 text-4xl text-primary/20 font-serif">
-                ”
-              </span>
             </p>
           </blockquote>
         )}
-      </div>
-      <div className="flex-shrink-0 flex items-center gap-1">
-        {entry.reactions.map((r, index) => (
-          <span key={index} className="text-lg">
-            {r.reaction}
-          </span>
-        ))}
       </div>
     </div>
   );
@@ -237,10 +236,39 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const router = useRouter();
-  const [historicalSentences, setHistoricalSentences] = useState<HistoricalEntryWithReactions[]>([]);
   const [dataReady, setDataReady] = useState(false);
   const allSentences = useMemo(() => getAllSentences(), []);
   
+  const memoriesCollectionRef = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'memories');
+  }, [firestore]);
+
+  const { data: memories, isLoading: memoriesLoading } = useCollection<Memory>(memoriesCollectionRef);
+
+  const historicalSentences = useMemo((): HistoricalEntryWithReactions[] => {
+    if (!memories) return [];
+
+    const memoriesMap = new Map(memories.map(m => [m.id, m]));
+    const today = new Date();
+    const oneYearAgo = new Date(Date.UTC(today.getUTCFullYear() - 1, today.getUTCMonth(), today.getUTCDate()));
+
+    return allSentences
+      .filter(entry => {
+        const entryDate = new Date(entry.date);
+        return entryDate.getTime() <= oneYearAgo.getTime();
+      })
+      .map(entry => {
+        const memoryId = `${entry.date.getUTCFullYear()}-${String(entry.date.getUTCMonth() + 1).padStart(2, '0')}-${String(entry.date.getUTCDate()).padStart(2, '0')}`;
+        const memory = memoriesMap.get(memoryId);
+        return {
+          ...entry,
+          reactions: memory?.reactions || []
+        };
+      });
+
+  }, [allSentences, memories]);
+
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.push('/login');
@@ -250,24 +278,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     async function setupData() {
         if (!user || !firestore) return;
-
         await ensureMemoryDocuments(firestore, allSentences);
-
-        const today = new Date();
-        const oneYearAgo = new Date(Date.UTC(today.getUTCFullYear() - 1, today.getUTCMonth(), today.getUTCDate()));
-        
-        const relevantSentences = allSentences.filter(entry => {
-            const entryDate = new Date(entry.date);
-            return entryDate.getTime() <= oneYearAgo.getTime();
-        });
-
-        const sentencesWithReactions = await Promise.all(
-            relevantSentences.map(async (entry) => {
-                const reactions = await getAllMemoryReactions(entry.date);
-                return { ...entry, reactions };
-            })
-        );
-        setHistoricalSentences(sentencesWithReactions);
         setDataReady(true);
     }
     if (user && firestore) {
@@ -276,7 +287,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   }, [allSentences, user, firestore]);
 
 
-  if (isUserLoading || !user || !dataReady) {
+  if (isUserLoading || !user || !dataReady || memoriesLoading) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-background text-foreground">
         <LoadingSpinner className="h-12 w-12 text-primary" />
@@ -532,3 +543,5 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     </main>
   );
 }
+
+    
