@@ -1,0 +1,217 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "username": {
+          "type": "string",
+          "description": "The user's username."
+        }
+      },
+      "required": [
+        "id",
+        "username"
+      ]
+    },
+    "Memory": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Memory",
+      "type": "object",
+      "description": "Represents a memory for a specific date, sentence, and AI generated art.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Memory entity."
+        },
+        "date": {
+          "type": "string",
+          "description": "The date of the memory (one year prior).",
+          "format": "date"
+        },
+        "sentence": {
+          "type": "string",
+          "description": "The user-defined sentence associated with the memory."
+        },
+        "aiArtUrl": {
+          "type": "string",
+          "description": "URL of the AI-generated stick figure art.",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "id",
+        "date",
+        "sentence",
+        "aiArtUrl"
+      ]
+    },
+    "UserMemoryReaction": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserMemoryReaction",
+      "type": "object",
+      "description": "Represents a user's reaction to a specific memory.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserMemoryReaction entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N UserMemoryReaction)"
+        },
+        "memoryId": {
+          "type": "string",
+          "description": "Reference to Memory. (Relationship: Memory 1:N UserMemoryReaction)"
+        },
+        "reaction": {
+          "type": "string",
+          "description": "The user's reaction to the memory (e.g., emoji)."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "memoryId",
+        "reaction"
+      ]
+    },
+    "ChatMessage": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ChatMessage",
+      "type": "object",
+      "description": "Represents a single message within the journal/chat conversation.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the ChatMessage entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N ChatMessage) The user who sent the message."
+        },
+        "memoryId": {
+          "type": "string",
+          "description": "Reference to Memory. (Relationship: Memory 1:N ChatMessage) The memory that the chat message is associated with."
+        },
+        "text": {
+          "type": "string",
+          "description": "The content of the chat message."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "The timestamp of when the message was sent.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "memoryId",
+        "text",
+        "timestamp"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles. Uses path-based ownership for private user data.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/memories/{memoryId}",
+        "definition": {
+          "entityName": "Memory",
+          "schema": {
+            "$ref": "#/backend/entities/Memory"
+          },
+          "description": "Stores memories for each user. Uses path-based ownership; only the user can access their memories.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "memoryId",
+              "description": "The unique identifier for the memory."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/memories/{memoryId}/reactions/{reactionId}",
+        "definition": {
+          "entityName": "UserMemoryReaction",
+          "schema": {
+            "$ref": "#/backend/entities/UserMemoryReaction"
+          },
+          "description": "Stores reactions to a specific memory for a specific user. Uses path-based ownership; only the user can create, update, or delete their reactions.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "memoryId",
+              "description": "The unique identifier for the memory."
+            },
+            {
+              "name": "reactionId",
+              "description": "The unique identifier for the reaction."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/memories/{memoryId}/chat_messages/{messageId}",
+        "definition": {
+          "entityName": "ChatMessage",
+          "schema": {
+            "$ref": "#/backend/entities/ChatMessage"
+          },
+          "description": "Stores chat messages related to a specific memory for a specific user. Uses path-based ownership; only the user can create, update, or delete their messages.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "memoryId",
+              "description": "The unique identifier for the memory."
+            },
+            {
+              "name": "messageId",
+              "description": "The unique identifier for the chat message."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to ensure data isolation and straightforward security rules by leveraging path-based ownership and denormalization. Each user has their own collection of memories and associated data, eliminating the need for complex `get()` calls in security rules. The `UserMemoryReaction` and `ChatMessage` subcollections are structured to enable easy querying and management of reactions and messages related to specific memories. Specifically, Authorization Independence is achieved by nesting data under `/users/{userId}`, where each user's data is isolated. The `UserMemoryReaction` and `ChatMessage` collections are nested under their respective `Memory` document, allowing for efficient queries and clear ownership. This design avoids hierarchical authorization dependencies, ensuring atomic operations.  The structure supports the required QAPs by using segregation and ownership models."
+  }
+}

@@ -1,0 +1,170 @@
+/**
+ * @fileoverview Firestore Security Rules for the application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model. Each user has exclusive
+ * access to their own data, preventing unauthorized access or modification.
+ *
+ * Data Structure:
+ * All data is nested under /users/{userId}, ensuring that each user's data is
+ * isolated from other users.  Memories, reactions, and chat messages are all
+ * stored as subcollections under the user's document.
+ *
+ * Key Security Decisions:
+ * - Users can only create, read, update, and delete their own data.
+ * - Listing other users' memories, reactions or messages is disallowed.
+ * - Data consistency between the path and the document's internal fields is
+ *   enforced on create and update operations to maintain ownership.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Rule for the /users/{userId} collection.
+     * @path /users/{userId}
+     * @allow (create) - User with UID 'user_abc' can create their own user document if the ID matches.
+     * @deny (create) - User with UID 'user_xyz' cannot create a user document with ID 'user_abc'.
+     * @allow (get) - User with UID 'user_abc' can get their own user document.
+     * @deny (get) - User with UID 'user_xyz' cannot get the user document for 'user_abc'.
+     * @allow (update) - User with UID 'user_abc' can update their own user document.
+     * @deny (update) - User with UID 'user_xyz' cannot update the user document for 'user_abc'.
+     * @allow (delete) - User with UID 'user_abc' can delete their own user document.
+     * @deny (delete) - User with UID 'user_xyz' cannot delete the user document for 'user_abc'.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId} {
+      // Helper function to check if the user is signed in
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      // Helper function to check if the requested user ID matches the authenticated user's ID.
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      // Helper function to check if the requested user ID matches the authenticated user's ID and resource exists.
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == userId;
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if false;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Rule for the /users/{userId}/memories/{memoryId} collection.
+     * @path /users/{userId}/memories/{memoryId}
+     * @allow (create) - User with UID 'user_abc' can create a memory under their user document if the 'id' and 'userId' match.
+     * @deny (create) - User with UID 'user_xyz' cannot create a memory under user 'user_abc'.
+     * @allow (get) - User with UID 'user_abc' can get their own memory.
+     * @deny (get) - User with UID 'user_xyz' cannot get the memory for 'user_abc'.
+     * @allow (list) - User with UID 'user_abc' can list their memories.
+     * @deny (update) - User with UID 'user_xyz' cannot update the memory for 'user_abc'.
+     * @allow (update) - User with UID 'user_abc' can update their own memory if the 'id' and 'userId' match.
+     * @allow (delete) - User with UID 'user_abc' can delete their own memory.
+     * @deny (delete) - User with UID 'user_xyz' cannot delete the memory for 'user_abc'.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId}/memories/{memoryId} {
+      // Helper function to check if the user is signed in
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      // Helper function to check if the requested user ID matches the authenticated user's ID.
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      // Helper function to check if the requested user ID matches the authenticated user's ID and resource exists.
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.userId == userId && request.resource.data.id == memoryId;
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isSignedIn() && isOwner(userId);
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Rule for the /users/{userId}/memories/{memoryId}/reactions/{reactionId} collection.
+     * @path /users/{userId}/memories/{memoryId}/reactions/{reactionId}
+     * @allow (create) - User with UID 'user_abc' can create a reaction under their memory if the 'userId', 'memoryId' and 'id' match.
+     * @deny (create) - User with UID 'user_xyz' cannot create a reaction under user 'user_abc'.
+     * @allow (get) - User with UID 'user_abc' can get their own reaction.
+     * @deny (get) - User with UID 'user_xyz' cannot get the reaction for 'user_abc'.
+     * @allow (list) - User with UID 'user_abc' can list their reactions.
+     * @deny (update) - User with UID 'user_xyz' cannot update the reaction for 'user_abc'.
+     * @allow (update) - User with UID 'user_abc' can update their own reaction if the 'userId', 'memoryId' and 'id' match.
+     * @allow (delete) - User with UID 'user_abc' can delete their own reaction.
+     * @deny (delete) - User with UID 'user_xyz' cannot delete the reaction for 'user_abc'.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId}/memories/{memoryId}/reactions/{reactionId} {
+      // Helper function to check if the user is signed in
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      // Helper function to check if the requested user ID matches the authenticated user's ID.
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      // Helper function to check if the requested user ID matches the authenticated user's ID and resource exists.
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.userId == userId && request.resource.data.memoryId == memoryId && request.resource.data.id == reactionId;
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isSignedIn() && isOwner(userId);
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId && request.resource.data.memoryId == resource.data.memoryId && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Rule for the /users/{userId}/memories/{memoryId}/chat_messages/{messageId} collection.
+     * @path /users/{userId}/memories/{memoryId}/chat_messages/{messageId}
+     * @allow (create) - User with UID 'user_abc' can create a chat message under their memory if the 'userId', 'memoryId' and 'id' match.
+     * @deny (create) - User with UID 'user_xyz' cannot create a chat message under user 'user_abc'.
+     * @allow (get) - User with UID 'user_abc' can get their own chat message.
+     * @deny (get) - User with UID 'user_xyz' cannot get the chat message for 'user_abc'.
+     * @allow (list) - User with UID 'user_abc' can list their chat messages.
+     * @deny (update) - User with UID 'user_xyz' cannot update the chat message for 'user_abc'.
+     * @allow (update) - User with UID 'user_abc' can update their own chat message if the 'userId', 'memoryId' and 'id' match.
+     * @allow (delete) - User with UID 'user_abc' can delete their own chat message.
+     * @deny (delete) - User with UID 'user_xyz' cannot delete the chat message for 'user_abc'.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId}/memories/{memoryId}/chat_messages/{messageId} {
+      // Helper function to check if the user is signed in
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      // Helper function to check if the requested user ID matches the authenticated user's ID.
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      // Helper function to check if the requested user ID matches the authenticated user's ID and resource exists.
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.userId == userId && request.resource.data.memoryId == memoryId && request.resource.data.id == messageId;
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isSignedIn() && isOwner(userId);
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId && request.resource.data.memoryId == resource.data.memoryId && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+  }
+}
