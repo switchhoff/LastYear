@@ -255,6 +255,14 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
 
 
 export default function Home() {
+  return (
+    <AuthWrapper>
+      <MainContent />
+    </AuthWrapper>
+  );
+}
+
+function MainContent() {
   const [content, setContent] = useState<DailyContent | null>(null);
   const [loading, setLoading] = useState(true);
   const [showContent, setShowContent] = useState(false);
@@ -377,142 +385,140 @@ export default function Home() {
   };
 
   return (
-    <AuthWrapper>
-      <main className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-background text-foreground">
-        <div className="absolute top-6 right-6 flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="h-12 w-12" onClick={() => auth.signOut()}>
-            <LogOut className="h-6 w-6" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-12 w-12"
-            onClick={() => setShowFeedback(!showFeedback)}
-          >
-            {showFeedback ? <EyeOff className="h-8 w-8" /> : <Eye className="h-8 w-8" />}
-            <span className="sr-only">
-              {showFeedback ? 'Hide feedback section' : 'Show feedback section'}
-            </span>
-          </Button>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-12 w-12"
-              >
-                <History className="h-8 w-8" />
-                <span className="sr-only">View History</span>
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="h-screen w-screen max-w-full flex flex-col">
-              <DialogHeader>
-                <DialogTitle>Historical Memories</DialogTitle>
-              </DialogHeader>
-              <div className="flex items-center space-x-4 px-1 py-4">
-                <div className='flex items-center space-x-2'>
-                  <Switch
-                    id="spoiler-alert"
-                    checked={spoilerAlert}
-                    onCheckedChange={setSpoilerAlert}
-                  />
-                  <Label htmlFor="spoiler-alert">Spoiler Alert</Label>
-                </div>
-                <Button variant="outline" onClick={handleRandomSelect}>Random</Button>
-              </div>
-              <ScrollArea className="flex-grow">
-                <div className="mt-4 flex flex-col gap-4 pr-4">
-                  {historicalSentences.length > 0 ? (
-                    historicalSentences.map((entry) => (
-                      <HistoricalEntry
-                        key={entry.date.toISOString()}
-                        entry={entry}
-                        onSelect={handleHistoricalSelect}
-                        showSentence={!spoilerAlert}
-                      />
-                    ))
-                  ) : (
-                    <p className="text-muted-foreground text-center">
-                      No memories found.
-                    </p>
-                  )}
-                </div>
-              </ScrollArea>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <div className="flex-grow flex flex-col items-center justify-center w-full">
-          {loading ? (
-            <div className="flex flex-col items-center gap-4">
-              <LoadingSpinner className="h-12 w-12 text-primary" />
-              <p className="text-muted-foreground">Recalling today's memory...</p>
-            </div>
-          ) : content ? (
-            <div
-              className={cn(
-                'flex flex-col items-center justify-center opacity-0 w-full',
-                showContent && 'animate-fade-in'
-              )}
+    <main className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-background text-foreground">
+      <div className="absolute top-6 right-6 flex items-center gap-2">
+        <Button variant="ghost" size="icon" className="h-12 w-12" onClick={() => auth.signOut()}>
+          <LogOut className="h-6 w-6" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-12 w-12"
+          onClick={() => setShowFeedback(!showFeedback)}
+        >
+          {showFeedback ? <EyeOff className="h-8 w-8" /> : <Eye className="h-8 w-8" />}
+          <span className="sr-only">
+            {showFeedback ? 'Hide feedback section' : 'Show feedback section'}
+          </span>
+        </Button>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-12 w-12"
             >
-              <div className="flex flex-col gap-2 mb-24">
-                <div className="flex items-center justify-center gap-2">
-                  <p className="text-md md:text-lg text-foreground/80">
-                    {content.dateString}
-                  </p>
-                  {content.memorableDate && (
-                    <Badge variant="outline">
-                      {content.memorableDate.emoji} {content.memorableDate.description}
-                    </Badge>
-                  )}
-                </div>
-                <h1 className="text-xl md:text-2xl font-bold text-foreground tracking-wider">
-                  One year ago today...
-                </h1>
+              <History className="h-8 w-8" />
+              <span className="sr-only">View History</span>
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="h-screen w-screen max-w-full flex flex-col">
+            <DialogHeader>
+              <DialogTitle>Historical Memories</DialogTitle>
+            </DialogHeader>
+            <div className="flex items-center space-x-4 px-1 py-4">
+              <div className='flex items-center space-x-2'>
+                <Switch
+                  id="spoiler-alert"
+                  checked={spoilerAlert}
+                  onCheckedChange={setSpoilerAlert}
+                />
+                <Label htmlFor="spoiler-alert">Spoiler Alert</Label>
               </div>
-              <blockquote className="relative max-w-2xl">
-                <p className="text-2xl md:text-3xl text-primary italic text-balance">
-                  <span className="absolute -left-4 -top-2 text-6xl text-primary/20 font-serif">“</span>
-                  {content.sentence}
-                  <span className="absolute -right-4 -bottom-4 text-6xl text-primary/20 font-serif">”</span>
-                </p>
-              </blockquote>
-              {showFeedback && <FeedbackSection content={content} />}
+              <Button variant="outline" onClick={handleRandomSelect}>Random</Button>
             </div>
-          ) : (
-            <div className="flex flex-col items-center gap-4 text-destructive">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="48"
-                height="48"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M6 10H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" />
-                <path d="M6 14H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2h-2" />
-                <path d="m13 6-4 6h6l-4 6" />
-              </svg>
-              <h2 className="text-2xl font-semibold">Something went wrong</h2>
-              <p>
-                We couldn't create your memory for today. Please check back later.
-              </p>
-            </div>
-          )}
-        </div>
-        {isViewingHistorical && !loading && (
-          <Button
-            variant="ghost"
-            onClick={fetchTodaysContent}
-            className="absolute bottom-8 animate-fade-in"
+            <ScrollArea className="flex-grow">
+              <div className="mt-4 flex flex-col gap-4 pr-4">
+                {historicalSentences.length > 0 ? (
+                  historicalSentences.map((entry) => (
+                    <HistoricalEntry
+                      key={entry.date.toISOString()}
+                      entry={entry}
+                      onSelect={handleHistoricalSelect}
+                      showSentence={!spoilerAlert}
+                    />
+                  ))
+                ) : (
+                  <p className="text-muted-foreground text-center">
+                    No memories found.
+                  </p>
+                )}
+              </div>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="flex-grow flex flex-col items-center justify-center w-full">
+        {loading ? (
+          <div className="flex flex-col items-center gap-4">
+            <LoadingSpinner className="h-12 w-12 text-primary" />
+            <p className="text-muted-foreground">Recalling today's memory...</p>
+          </div>
+        ) : content ? (
+          <div
+            className={cn(
+              'flex flex-col items-center justify-center opacity-0 w-full',
+              showContent && 'animate-fade-in'
+            )}
           >
-            Back to today...
-          </Button>
+            <div className="flex flex-col gap-2 mb-24">
+              <div className="flex items-center justify-center gap-2">
+                <p className="text-md md:text-lg text-foreground/80">
+                  {content.dateString}
+                </p>
+                {content.memorableDate && (
+                  <Badge variant="outline">
+                    {content.memorableDate.emoji} {content.memorableDate.description}
+                  </Badge>
+                )}
+              </div>
+              <h1 className="text-xl md:text-2xl font-bold text-foreground tracking-wider">
+                One year ago today...
+              </h1>
+            </div>
+            <blockquote className="relative max-w-2xl">
+              <p className="text-2xl md:text-3xl text-primary italic text-balance">
+                <span className="absolute -left-4 -top-2 text-6xl text-primary/20 font-serif">“</span>
+                {content.sentence}
+                <span className="absolute -right-4 -bottom-4 text-6xl text-primary/20 font-serif">”</span>
+              </p>
+            </blockquote>
+            {showFeedback && <FeedbackSection content={content} />}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-4 text-destructive">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="48"
+              height="48"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M6 10H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" />
+              <path d="M6 14H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2h-2" />
+              <path d="m13 6-4 6h6l-4 6" />
+            </svg>
+            <h2 className="text-2xl font-semibold">Something went wrong</h2>
+            <p>
+              We couldn't create your memory for today. Please check back later.
+            </p>
+          </div>
         )}
-      </main>
-    </AuthWrapper>
+      </div>
+      {isViewingHistorical && !loading && (
+        <Button
+          variant="ghost"
+          onClick={fetchTodaysContent}
+          className="absolute bottom-8 animate-fade-in"
+        >
+          Back to today...
+        </Button>
+      )}
+    </main>
   );
 }
