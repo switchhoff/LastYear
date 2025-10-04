@@ -16,6 +16,7 @@ import {
   LogOut,
   MessageSquare,
   RefreshCcw,
+  PlusCircle,
 } from 'lucide-react';
 import {
   Dialog,
@@ -24,13 +25,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { getAllSentences, type DatedSentence } from '@/lib/daily-content';
 import { getMemorableDate, type MemorableDate } from '@/lib/memorable-dates';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import {
   saveReaction,
@@ -132,121 +133,6 @@ const allEmojis = [
   '🔚', '🔙', '🔛', '🔝', '🔜', '⏳', '⏰', '💡', '💤', '💥', '💦', '💨',
 ];
 
-
-function FeedbackSection({ content, memoryData }: { content: DailyContent; memoryData: Memory | null }) {
-  const { user } = useUser();
-  const firestore = useFirestore();
-  const [isSending, setIsSending] = useState(false);
-
-  const reactions = useMemo(() => memoryData?.reactions || [], [memoryData]);
-  const userReaction = useMemo(() => {
-    return reactions.find((r) => r.userId === user?.uid)?.reaction || null;
-  }, [reactions, user?.uid]);
-
-  const [displayedEmojis, setDisplayedEmojis] = useState<string[]>([]);
-
-  const generateEmojis = useCallback((currentReaction: string | null, preserveSpot: boolean = false) => {
-    // Filter out the current selection to avoid duplicates in the random pool
-    const emojiPool = allEmojis.filter(e => e !== currentReaction);
-    const shuffled = [...emojiPool].sort(() => 0.5 - Math.random());
-    
-    // Determine how many new emojis to pick
-    const emojisToPick = preserveSpot && currentReaction ? 4 : 5;
-    const newEmojis = shuffled.slice(0, emojisToPick);
-
-    if (preserveSpot && currentReaction) {
-        // If preserving spot, we rebuild the array around the current reaction
-        const currentReactionIndex = displayedEmojis.indexOf(currentReaction);
-        if (currentReactionIndex !== -1) {
-            const finalEmojis = [...newEmojis];
-            finalEmojis.splice(currentReactionIndex, 0, currentReaction);
-            // Ensure we still only have 5 emojis, removing any extra if needed
-            const finalDisplay = finalEmojis.slice(0,5);
-            // Check if the current reaction is still there after slicing, if not, put it back in.
-            if(!finalDisplay.includes(currentReaction)) {
-              finalDisplay[currentReactionIndex] = currentReaction;
-            }
-            setDisplayedEmojis(finalDisplay);
-        } else {
-             // currentReaction was not in displayedEmojis, so we fallback to non-preserving logic
-            if (!newEmojis.includes(currentReaction)) {
-              newEmojis[Math.floor(Math.random() * newEmojis.length)] = currentReaction;
-            }
-            setDisplayedEmojis(newEmojis);
-        }
-
-    } else {
-        // Standard logic: just pick 5 new ones
-        // If there's a current reaction, ensure it's included in the new set
-        if (currentReaction && !newEmojis.includes(currentReaction)) {
-          // Replace a random emoji with the current one
-          newEmojis[Math.floor(Math.random() * newEmojis.length)] = currentReaction;
-        }
-        setDisplayedEmojis(newEmojis);
-    }
-  }, [displayedEmojis]);
-
-  useEffect(() => {
-    // Initial emoji generation when the component mounts or content changes
-    generateEmojis(userReaction);
-  // We only want to run this effect once to set the initial emojis.
-  // userReaction is intentionally left out to prevent re-shuffling when the user clicks a reaction.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [content]);
-
-
-  const handleReact = async (emoji: string) => {
-    if (!user || !firestore) return;
-    setIsSending(true);
-    const newEmoji = userReaction === emoji ? null : emoji;
-    await saveReaction(firestore, user, content.yearAgoDate, newEmoji);
-    setIsSending(false);
-  };
-  
-  const handleRefreshEmojis = () => {
-    generateEmojis(userReaction, true);
-  }
-
-  return (
-    <div className="w-full max-w-2xl mt-12 animate-fade-in">
-      <Tabs defaultValue="react" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="react">React Mode</TabsTrigger>
-          <TabsTrigger value="journal">Journal Mode</TabsTrigger>
-        </TabsList>
-        <TabsContent value="react">
-          <div className="flex justify-center items-center gap-2 p-4">
-            {displayedEmojis.map((emoji) => (
-              <Button
-                key={emoji}
-                variant={userReaction === emoji ? 'default' : 'outline'}
-                size="icon"
-                className="text-2xl rounded-full h-14 w-14"
-                onClick={() => handleReact(emoji)}
-                disabled={isSending || !user}
-              >
-                {emoji}
-              </Button>
-            ))}
-             <Button
-              variant="ghost"
-              size="icon"
-              className="h-14 w-14 rounded-full"
-              onClick={handleRefreshEmojis}
-              disabled={isSending || !user}
-            >
-              <RefreshCcw className="h-6 w-6 text-muted-foreground" />
-            </Button>
-          </div>
-        </TabsContent>
-        <TabsContent value="journal">
-          <ChatSection content={content} memoryData={memoryData} />
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
-
 function ChatSection({ content, memoryData }: { content: DailyContent, memoryData: Memory | null }) {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -274,52 +160,54 @@ function ChatSection({ content, memoryData }: { content: DailyContent, memoryDat
   };
 
   return (
-    <div className="flex flex-col h-[400px] bg-muted/50 rounded-lg p-4">
-      <ScrollArea className="flex-grow mb-4 pr-4" ref={scrollAreaRef}>
-        <div className="flex flex-col gap-4">
-          {messages?.map((msg, index) => {
-            const isCurrentUser = msg.userId === user?.uid;
-            const isAlex = msg.userId === ALEX_USER_ID;
-            const isAmalie = msg.userId === AMALIE_USER_ID;
+    <div className="w-full max-w-2xl mt-8">
+      <div className="flex flex-col h-[400px] bg-muted/50 rounded-lg p-4">
+        <ScrollArea className="flex-grow mb-4 pr-4" ref={scrollAreaRef}>
+          <div className="flex flex-col gap-4">
+            {messages?.map((msg, index) => {
+              const isCurrentUser = msg.userId === user?.uid;
+              const isAlex = msg.userId === ALEX_USER_ID;
+              const isAmalie = msg.userId === AMALIE_USER_ID;
 
-            return (
-              <div
-                key={index}
-                className={cn(
-                  'flex flex-col max-w-[75%] p-2 px-3 rounded-lg',
-                  isCurrentUser
-                    ? 'self-end items-end'
-                    : 'self-start items-start',
-                  isAlex && !isCurrentUser && 'bg-yellow-200 text-black',
-                  isAmalie && !isCurrentUser && 'bg-pink-200 text-black',
-                  isCurrentUser && 'bg-primary text-primary-foreground',
-                  !isCurrentUser && !isAlex && !isAmalie && 'bg-background'
-                )}
-              >
-                <span className="text-xs text-muted-foreground">{msg.userName}</span>
-                <p>{msg.text}</p>
-              </div>
-            );
-          })}
+              return (
+                <div
+                  key={index}
+                  className={cn(
+                    'flex flex-col max-w-[75%] p-2 px-3 rounded-lg',
+                    isCurrentUser
+                      ? 'self-end items-end'
+                      : 'self-start items-start',
+                    isAlex && !isCurrentUser && 'bg-yellow-200 text-black',
+                    isAmalie && !isCurrentUser && 'bg-pink-200 text-black',
+                    isCurrentUser && 'bg-primary text-primary-foreground',
+                    !isCurrentUser && !isAlex && !isAmalie && 'bg-background'
+                  )}
+                >
+                  <span className="text-xs text-muted-foreground">{msg.userName}</span>
+                  <p>{msg.text}</p>
+                </div>
+              );
+            })}
+          </div>
+        </ScrollArea>
+        <div className="flex items-center gap-2">
+          <Textarea
+            placeholder="Your thoughts on this memory..."
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            className="bg-background"
+            disabled={isSending || !user}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
+          />
+          <Button onClick={handleSendMessage} disabled={isSending || !user}>
+            {isSending ? <LoadingSpinner /> : <Send />}
+          </Button>
         </div>
-      </ScrollArea>
-      <div className="flex items-center gap-2">
-        <Textarea
-          placeholder="Your thoughts on this memory..."
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          className="bg-background"
-          disabled={isSending || !user}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              handleSendMessage();
-            }
-          }}
-        />
-        <Button onClick={handleSendMessage} disabled={isSending || !user}>
-          {isSending ? <LoadingSpinner /> : <Send />}
-        </Button>
       </div>
     </div>
   );
@@ -411,8 +299,14 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   const [isViewingHistorical, setIsViewingHistorical] = useState(false);
   const [showFeedback, setShowFeedback] = useState(true);
   const { toast } = useToast();
+  const { user } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
+
+  const [isSending, setIsSending] = useState(false);
+  const [displayedEmojis, setDisplayedEmojis] = useState<string[]>([]);
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+
 
   const getMemoryDocId = (date: Date): string => {
     const day = String(date.getUTCDate()).padStart(2, '0');
@@ -429,8 +323,62 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
 
   const { data: memoryData } = useDoc<Memory>(memoryDocRef);
 
+  const reactions = useMemo(() => memoryData?.reactions || [], [memoryData]);
+  const userReaction = useMemo(() => {
+    return reactions.find((r) => r.userId === user?.uid)?.reaction || null;
+  }, [reactions, user?.uid]);
+
   const alexReaction = useMemo(() => memoryData?.reactions.find(r => r.userId === ALEX_USER_ID)?.reaction, [memoryData]);
   const amalieReaction = useMemo(() => memoryData?.reactions.find(r => r.userId === AMALIE_USER_ID)?.reaction, [memoryData]);
+
+  const generateEmojis = useCallback((currentReaction: string | null, preserveSpot: boolean = false) => {
+    const emojiPool = allEmojis.filter(e => e !== currentReaction);
+    const shuffled = [...emojiPool].sort(() => 0.5 - Math.random());
+    
+    const emojisToPick = preserveSpot && currentReaction ? 4 : 5;
+    const newEmojis = shuffled.slice(0, emojisToPick);
+
+    if (preserveSpot && currentReaction) {
+        const currentReactionIndex = displayedEmojis.indexOf(currentReaction);
+        if (currentReactionIndex !== -1) {
+            const finalEmojis = [...newEmojis];
+            finalEmojis.splice(currentReactionIndex, 0, currentReaction);
+            const finalDisplay = finalEmojis.slice(0,5);
+            if(!finalDisplay.includes(currentReaction)) {
+              finalDisplay[currentReactionIndex] = currentReaction;
+            }
+            setDisplayedEmojis(finalDisplay);
+        } else {
+            if (!newEmojis.includes(currentReaction)) {
+              newEmojis[Math.floor(Math.random() * newEmojis.length)] = currentReaction;
+            }
+            setDisplayedEmojis(newEmojis);
+        }
+    } else {
+        if (currentReaction && !newEmojis.includes(currentReaction)) {
+          newEmojis[Math.floor(Math.random() * newEmojis.length)] = currentReaction;
+        }
+        setDisplayedEmojis(newEmojis.slice(0,5));
+    }
+  }, [displayedEmojis]);
+
+  useEffect(() => {
+    generateEmojis(userReaction);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [content]);
+
+  const handleReact = async (emoji: string) => {
+    if (!user || !firestore || !content) return;
+    setIsSending(true);
+    const newEmoji = userReaction === emoji ? null : emoji;
+    await saveReaction(firestore, user, content.yearAgoDate, newEmoji);
+    setIsSending(false);
+    setIsPopoverOpen(false); // Close popover on selection
+  };
+  
+  const handleRefreshEmojis = () => {
+    generateEmojis(userReaction, true);
+  }
 
   const fetchContent = useCallback(async (date: Date) => {
     try {
@@ -623,9 +571,46 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
             </div>
             
             <div className="relative bg-card border rounded-lg shadow-sm p-8 max-w-2xl">
-                <div className="absolute top-0 right-0 -mt-4 -mr-2 flex gap-1">
+                <div className="absolute top-0 right-0 -mt-4 -mr-2 flex gap-1 items-center">
                     {alexReaction && <Badge className="text-lg p-1.5 bg-yellow-200 text-black shadow-md">{alexReaction}</Badge>}
                     {amalieReaction && <Badge className="text-lg p-1.5 bg-pink-200 text-black shadow-md">{amalieReaction}</Badge>}
+                    <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+                      <PopoverTrigger asChild>
+                         <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 rounded-full bg-background hover:bg-muted"
+                          disabled={isSending || !user}
+                        >
+                          <PlusCircle className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-2">
+                        <div className="flex justify-center items-center gap-2">
+                          {displayedEmojis.map((emoji) => (
+                            <Button
+                              key={emoji}
+                              variant={userReaction === emoji ? 'default' : 'outline'}
+                              size="icon"
+                              className="text-2xl rounded-full h-12 w-12"
+                              onClick={() => handleReact(emoji)}
+                              disabled={isSending}
+                            >
+                              {emoji}
+                            </Button>
+                          ))}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-12 w-12 rounded-full"
+                            onClick={handleRefreshEmojis}
+                            disabled={isSending}
+                          >
+                            <RefreshCcw className="h-5 w-5 text-muted-foreground" />
+                          </Button>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                 </div>
                 <blockquote className="relative">
                   <p className="text-2xl md:text-3xl text-primary italic text-balance">
@@ -636,7 +621,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
                 </blockquote>
             </div>
 
-            {showFeedback && <FeedbackSection content={content} memoryData={memoryData} />}
+            {showFeedback && <ChatSection content={content} memoryData={memoryData} />}
           </div>
         ) : (
           <div className="flex flex-col items-center gap-4 text-destructive">
@@ -674,8 +659,3 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     </main>
   );
 }
-
-
-
-
-    
