@@ -116,7 +116,22 @@ function HistoricalEntry({
   );
 }
 
-const positiveEmojis = ['😊', '❤️', '😂', '😍', '👍', '🥹', '🥰', '🎉', '🤩'];
+const allEmojis = [
+  '😊', '😂', '❤️', '😍', '👍', '🙏', '🎉', '🤩', '🤔', '😢', '🔥', '💯',
+  '✨', '🌟', '💫', '🌸', '😂', '😎', '😜', '🥰', '🥹', '🥺', '😏', '😬',
+  '😴', '😇', '😈', '🤡', '👻', '👽', '🤖', '👋', '🤝', '🙌', '🙏', '💪',
+  '🧠', '👀', '🗣️', '👣', '👑', '💎', '💍', '💖', '💘', '💝', '💞', '💓',
+  '💔', '❤️‍🔥', '💌', '💐', '🌹', '🥀', '🌷', '🌺', '🌻', '🌞', '🌕', '🌜',
+  '⭐', '🌈', '🌊', '🌲', '🌳', '🌴', '🌿', '☘️', '🍁', '🍂', '🍄', '🌵',
+  '🌍', '🏔️', '🌋', '🏞️', '🏜️', '🏝️', '🌅', '🌄', '🌇', '🏙️', '🌉', '⛺',
+  '🏠', '🏰', '🗼', '🗽', '🗿', '🎨', '🎬', '🎤', '🎧', '🎼', '🎹', '🎸',
+  '🎻', '🎺', '🥁', '🎯', '🎳', '🎱', '🎮', '🧩', '♟️', '🎲', '🚀', '✈️',
+  '🚗', '🚲', '🚶', '🏃', '💃', '🕺', '🥳', '🎈', '🎁', '🎂', '🍻', '🥂',
+  '🍾', '🍿', '🍕', '🍔', '🍟', '🍣', '🍩', '🍪', '🍫', '🍭', '🍦', '☕',
+  '🍵', '🍷', '🍹', '💯', '🔥', '✅', '✔️', '☑️', '➕', '➖', '➗', '✖️',
+  '🔚', '🔙', '🔛', '🔝', '🔜', '⏳', '⏰', '💡', '💤', '💥', '💦', '💨',
+];
+
 
 function FeedbackSection({ content }: { content: DailyContent }) {
   const { user } = useUser();
@@ -141,22 +156,54 @@ function FeedbackSection({ content }: { content: DailyContent }) {
 
   const [displayedEmojis, setDisplayedEmojis] = useState<string[]>([]);
 
-  const generateEmojis = useCallback((currentReaction: string | null) => {
-    const shuffled = [...positiveEmojis].sort(() => 0.5 - Math.random());
-    const newEmojis = shuffled.slice(0, 5);
+  const generateEmojis = useCallback((currentReaction: string | null, preserveSpot: boolean = false) => {
+    // Filter out the current selection to avoid duplicates in the random pool
+    const emojiPool = allEmojis.filter(e => e !== currentReaction);
+    const shuffled = [...emojiPool].sort(() => 0.5 - Math.random());
+    
+    // Determine how many new emojis to pick
+    const emojisToPick = preserveSpot && currentReaction ? 4 : 5;
+    const newEmojis = shuffled.slice(0, emojisToPick);
 
-    if (currentReaction && !newEmojis.includes(currentReaction)) {
-      newEmojis[Math.floor(Math.random() * newEmojis.length)] = currentReaction;
+    if (preserveSpot && currentReaction) {
+        // If preserving spot, we rebuild the array around the current reaction
+        const currentReactionIndex = displayedEmojis.indexOf(currentReaction);
+        if (currentReactionIndex !== -1) {
+            const finalEmojis = [...newEmojis];
+            finalEmojis.splice(currentReactionIndex, 0, currentReaction);
+            // Ensure we still only have 5 emojis, removing any extra if needed
+            const finalDisplay = finalEmojis.slice(0,5);
+            // Check if the current reaction is still there after slicing, if not, put it back in.
+            if(!finalDisplay.includes(currentReaction)) {
+              finalDisplay[currentReactionIndex] = currentReaction;
+            }
+            setDisplayedEmojis(finalDisplay);
+        } else {
+             // currentReaction was not in displayedEmojis, so we fallback to non-preserving logic
+            if (!newEmojis.includes(currentReaction)) {
+              newEmojis[Math.floor(Math.random() * newEmojis.length)] = currentReaction;
+            }
+            setDisplayedEmojis(newEmojis);
+        }
+
+    } else {
+        // Standard logic: just pick 5 new ones
+        // If there's a current reaction, ensure it's included in the new set
+        if (currentReaction && !newEmojis.includes(currentReaction)) {
+          // Replace a random emoji with the current one
+          newEmojis[Math.floor(Math.random() * newEmojis.length)] = currentReaction;
+        }
+        setDisplayedEmojis(newEmojis);
     }
-    setDisplayedEmojis(newEmojis);
-  }, []);
+  }, [displayedEmojis]);
 
   useEffect(() => {
+    // Initial emoji generation when the component mounts or content changes
     generateEmojis(userReaction);
-  // We only want to run this effect once when the content changes to set the initial emojis.
-  // userReaction is intentionally left out of dependencies to prevent re-shuffling on reaction change.
+  // We only want to run this effect once to set the initial emojis.
+  // userReaction is intentionally left out to prevent re-shuffling when the user clicks a reaction.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [content, generateEmojis]);
+  }, [content]);
 
 
   const handleReact = async (emoji: string) => {
@@ -168,7 +215,7 @@ function FeedbackSection({ content }: { content: DailyContent }) {
   };
   
   const handleRefreshEmojis = () => {
-    generateEmojis(userReaction);
+    generateEmojis(userReaction, true);
   }
 
   return (
@@ -611,3 +658,4 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     </main>
   );
 }
+
