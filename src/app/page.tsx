@@ -133,22 +133,11 @@ const allEmojis = [
 ];
 
 
-function FeedbackSection({ content }: { content: DailyContent }) {
+function FeedbackSection({ content, memoryData }: { content: DailyContent; memoryData: Memory | null }) {
   const { user } = useUser();
   const firestore = useFirestore();
   const [isSending, setIsSending] = useState(false);
-  
-  const memoryDocRef = useMemoFirebase(() => {
-    if (!firestore || !content.yearAgoDate) return null;
-    const day = String(content.yearAgoDate.getUTCDate()).padStart(2, '0');
-    const month = String(content.yearAgoDate.getUTCMonth() + 1).padStart(2, '0');
-    const year = content.yearAgoDate.getUTCFullYear();
-    const memoryId = `${year}-${month}-${day}`;
-    return doc(firestore, 'memories', memoryId);
-  }, [firestore, content.yearAgoDate]);
 
-  const { data: memoryData } = useDoc<Memory>(memoryDocRef);
-  
   const reactions = useMemo(() => memoryData?.reactions || [], [memoryData]);
   const userReaction = useMemo(() => {
     return reactions.find((r) => r.userId === user?.uid)?.reaction || null;
@@ -423,6 +412,25 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   const [showFeedback, setShowFeedback] = useState(true);
   const { toast } = useToast();
   const auth = useAuth();
+  const firestore = useFirestore();
+
+  const memoryDocRef = useMemoFirebase(() => {
+    if (!firestore || !content) return null;
+    const memoryId = getMemoryDocId(content.yearAgoDate);
+    return doc(firestore, 'memories', memoryId);
+  }, [firestore, content]);
+
+  const { data: memoryData } = useDoc<Memory>(memoryDocRef);
+
+  const alexReaction = useMemo(() => memoryData?.reactions.find(r => r.userId === ALEX_USER_ID)?.reaction, [memoryData]);
+  const amalieReaction = useMemo(() => memoryData?.reactions.find(r => r.userId === AMALIE_USER_ID)?.reaction, [memoryData]);
+
+  const getMemoryDocId = (date: Date): string => {
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const year = date.getUTCFullYear();
+    return `${year}-${month}-${day}`;
+  };
   
   const fetchContent = useCallback(async (date: Date) => {
     try {
@@ -613,14 +621,22 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
                 One year ago today...
               </h1>
             </div>
-            <blockquote className="relative max-w-2xl">
-              <p className="text-2xl md:text-3xl text-primary italic text-balance">
-                <span className="absolute -left-4 -top-2 text-6xl text-primary/20 font-serif">“</span>
-                {content.sentence}
-                <span className="absolute -right-4 -bottom-4 text-6xl text-primary/20 font-serif">”</span>
-              </p>
-            </blockquote>
-            {showFeedback && <FeedbackSection content={content} />}
+            
+            <div className="relative bg-card border rounded-lg shadow-sm p-8 max-w-2xl">
+                <div className="absolute top-0 right-0 -mt-4 -mr-2 flex gap-1">
+                    {alexReaction && <Badge className="text-lg p-1.5 bg-yellow-200 text-black shadow-md">{alexReaction}</Badge>}
+                    {amalieReaction && <Badge className="text-lg p-1.5 bg-pink-200 text-black shadow-md">{amalieReaction}</Badge>}
+                </div>
+                <blockquote className="relative">
+                  <p className="text-2xl md:text-3xl text-primary italic text-balance">
+                    <span className="absolute -left-4 -top-2 text-6xl text-primary/20 font-serif">“</span>
+                    {content.sentence}
+                    <span className="absolute -right-4 -bottom-4 text-6xl text-primary/20 font-serif">”</span>
+                  </p>
+                </blockquote>
+            </div>
+
+            {showFeedback && <FeedbackSection content={content} memoryData={memoryData} />}
           </div>
         ) : (
           <div className="flex flex-col items-center gap-4 text-destructive">
@@ -658,4 +674,5 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     </main>
   );
 }
+
 
