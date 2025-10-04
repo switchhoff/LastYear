@@ -138,15 +138,21 @@ function FeedbackSection({ content }: { content: DailyContent }) {
     return reactions.find((r) => r.userId === user?.uid)?.reaction || null;
   }, [reactions, user?.uid]);
 
-  const displayedEmojis = useMemo(() => {
-    if (userReaction) {
-      const otherEmojis = positiveEmojis.filter((e) => e !== userReaction);
-      const shuffled = otherEmojis.sort(() => 0.5 - Math.random());
-      return [userReaction, ...shuffled.slice(0, 4)];
-    }
+  const [displayedEmojis, setDisplayedEmojis] = useState<string[]>([]);
+
+  useEffect(() => {
     const shuffled = [...positiveEmojis].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, 5);
-  }, [userReaction]);
+    const initialEmojis = shuffled.slice(0, 5);
+    
+    if (userReaction && !initialEmojis.includes(userReaction)) {
+        initialEmojis[Math.floor(Math.random() * initialEmojis.length)] = userReaction;
+    }
+    setDisplayedEmojis(initialEmojis);
+  // We only want to run this effect once when the content changes to set the initial emojis.
+  // userReaction is intentionally left out of dependencies to prevent re-shuffling on reaction change.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [content]);
+
 
   const handleReact = async (emoji: string) => {
     if (!user || !firestore) return;
@@ -587,5 +593,3 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     </main>
   );
 }
-
-    
