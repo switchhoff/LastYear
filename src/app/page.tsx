@@ -9,7 +9,6 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   History,
-  Eye,
   EyeOff,
   Send,
   LogOut,
@@ -18,7 +17,7 @@ import {
   PlusCircle,
   Pencil,
   Save,
-  Calendar as CalendarIcon,
+  Lock,
 } from 'lucide-react';
 import {
   Dialog,
@@ -48,7 +47,7 @@ import {
 import { useUser, useAuth, useMemoFirebase, useDoc, useFirestore, useCollection } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
 import { Calendar } from '@/components/ui/calendar';
-import { addDays, format } from "date-fns"
+import { Eye } from 'lucide-react';
 
 
 type DailyContent = {
@@ -258,7 +257,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
         displayDate.setHours(0,0,0,0);
 
         if (displayDate <= today) {
-             const sentence = (memory.userSentences && Object.values(memory.userSentences)[0]) || (memory as any).sentence || "No sentence found.";
+            const sentence = (memory.userSentences && Object.values(memory.userSentences)[0]) || "No sentence found.";
             
             combinedEntries.push({
                 date: memoryDate,
@@ -381,10 +380,6 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     if (!memoryData) return null;
     if (memoryData.userSentences && Object.keys(memoryData.userSentences).length > 0) {
       return Object.values(memoryData.userSentences)[0];
-    }
-    // Fallback for legacy data structure
-    if ((memoryData as any).sentence) {
-      return (memoryData as any).sentence;
     }
     return null;
   }, [memoryData]);
@@ -540,6 +535,17 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     setSelectedDateForEditing(undefined);
     setNewUserSentence('');
   }
+
+  const isEditingDateToday = useMemo(() => {
+      if (!selectedDateForEditing) return false;
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const editingDate = new Date(selectedDateForEditing);
+      editingDate.setHours(0,0,0,0);
+      return today.getTime() === editingDate.getTime();
+  }, [selectedDateForEditing]);
+
+  const showLockForPastMemory = mode === 'add' && !!userSentenceForEditingDate && !isEditingDateToday;
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-background text-foreground">
@@ -755,16 +761,27 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
                   What's on your mind today?
                 </h1>
               </div>
-              <Textarea
-                value={newUserSentence}
-                onChange={(e) => setNewUserSentence(e.target.value)}
-                placeholder="Write your memory for this day..."
-                className="w-full min-h-[200px] text-lg p-4"
-              />
-              <Button onClick={handleSaveSentence} disabled={isSending || !newUserSentence.trim()} className="mt-4">
-                {isSending ? <LoadingSpinner className="mr-2"/> : <Save className="mr-2"/>}
-                Save Memory
-              </Button>
+
+              {showLockForPastMemory ? (
+                 <div className="flex flex-col items-center justify-center gap-4 text-muted-foreground border rounded-lg p-8 w-full min-h-[250px]">
+                    <Lock className="h-10 w-10"/>
+                    <p className="text-lg font-medium">You have already recorded this memory.</p>
+                    <p className="text-sm">It will be revealed to you in a year!</p>
+                 </div>
+              ) : (
+                <>
+                  <Textarea
+                    value={newUserSentence}
+                    onChange={(e) => setNewUserSentence(e.target.value)}
+                    placeholder="Write your memory for this day..."
+                    className="w-full min-h-[200px] text-lg p-4"
+                  />
+                  <Button onClick={handleSaveSentence} disabled={isSending || !newUserSentence.trim()} className="mt-4">
+                    {isSending ? <LoadingSpinner className="mr-2"/> : <Save className="mr-2"/>}
+                    Save Memory
+                  </Button>
+                </>
+              )}
            </div>
         ) : (
           <div className="flex flex-col items-center gap-4 text-destructive">

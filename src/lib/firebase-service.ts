@@ -50,21 +50,23 @@ export async function saveUserSentence(
   const memoryId = getMemoryDocId(date);
   const memoryRef = doc(firestore, 'memories', memoryId);
 
-  // Use dot notation to update a specific field in the map
-  const dataToUpdate = { 
-    [`userSentences.${user.uid}`]: sentence 
+  const dataToUpdate = {
+    userSentences: {
+      [user.uid]: sentence,
+    },
+    // Also ensure base fields are there if creating
+    id: memoryId,
+    date: date.toISOString().split('T')[0],
   };
-  
-  try {
-     // Use setDoc with merge to create the doc if it doesn't exist,
-     // or update just the user's sentence field.
-    await setDoc(memoryRef, dataToUpdate, { merge: true });
 
+  try {
+    // Use setDoc with merge to create/update without overwriting other users' sentences
+    await setDoc(memoryRef, dataToUpdate, { merge: true });
   } catch (error) {
-     const contextualError = new FirestorePermissionError({
+    const contextualError = new FirestorePermissionError({
       operation: 'write',
       path: memoryRef.path,
-      requestResourceData: dataToUpdate
+      requestResourceData: dataToUpdate,
     });
     errorEmitter.emit('permission-error', contextualError);
   }
@@ -118,7 +120,7 @@ export async function addChatMessage(
   if (!user || !text.trim()) return;
 
   const memoryId = getMemoryDocId(new Date(memoryDate));
-  const memoryRef = doc(firestore, 'memories', memoryId);
+  const memoryRef = doc(firestore, 'mememies', memoryId);
 
   try {
     const userDocRef = doc(firestore, 'users', user.uid);
@@ -158,8 +160,6 @@ export async function ensureMemoryDocuments(firestore: Firestore, allSentences: 
             const memoryId = getMemoryDocId(sentence.date);
             const memoryRef = doc(firestore, 'memories', memoryId);
             
-            // For existing docs, we'll merge the new data structure.
-            // For new docs, we'll create them with the new structure.
             const newMemoryData = {
                 id: memoryId,
                 date: sentence.date.toISOString().split('T')[0],
