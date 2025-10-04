@@ -429,18 +429,18 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     generateEmojis(userReaction, true);
   }
 
-  const fetchContent = useCallback(async (targetDate: Date) => {
+  const fetchContent = useCallback((targetDate: Date) => {
     try {
       setLoading(true);
       setShowContent(false);
       setContent(null);
-
+      
       const displayDate = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate()));
       const memoryDate = new Date(displayDate);
       memoryDate.setUTCFullYear(displayDate.getUTCFullYear() - 1);
       
       const today = new Date();
-      const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+      const todayUTC = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
       const isToday = displayDate.getTime() === todayUTC.getTime();
 
       const dateString = displayDate.toLocaleDateString('en-GB', {
@@ -707,7 +707,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
             )}>
               <div className="flex flex-col gap-2 mb-8 w-full">
                 <p className="text-lg text-foreground/80 text-center">
-                  {new Date().toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+                  {new Date().toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC' })}
                 </p>
                 <h1 className="text-2xl font-bold text-foreground tracking-wider text-center">
                   What's on your mind today?
