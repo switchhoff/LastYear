@@ -52,6 +52,9 @@ type DailyContent = {
 
 type HistoricalEntryWithReactions = DatedSentence & { reactions: UserReaction[] };
 
+const ALEX_USER_ID = '1xcBSDAluySuyeLwX5TEQnuiPMA2';
+const AMALIE_USER_ID = 'SFsKmCQM9NZi7Drmsb4pNBtLJ6m1';
+
 function HistoricalEntry({
   entry,
   onSelect,
@@ -61,12 +64,15 @@ function HistoricalEntry({
   onSelect: (date: Date) => void;
   showSentence: boolean;
 }) {
+  const alexReaction = useMemo(() => entry.reactions.find(r => r.userId === ALEX_USER_ID)?.reaction, [entry.reactions]);
+  const amalieReaction = useMemo(() => entry.reactions.find(r => r.userId === AMALIE_USER_ID)?.reaction, [entry.reactions]);
+
   return (
     <div
-      className="flex items-start justify-between gap-4 p-2 rounded-md hover:bg-muted cursor-pointer"
+      className="grid grid-cols-3 items-center gap-4 p-2 rounded-md hover:bg-muted cursor-pointer"
       onClick={() => onSelect(entry.date)}
     >
-      <div className="flex-grow">
+      <div className="flex-grow col-span-1">
         <div className="flex items-center gap-2">
             <span className="font-semibold">
             {entry.date.toLocaleDateString('en-GB', {
@@ -76,13 +82,6 @@ function HistoricalEntry({
                 timeZone: 'UTC',
             })}
             </span>
-            <div className="flex-shrink-0 flex items-center gap-1">
-                {entry.reactions.map((r, index) => (
-                <span key={index} className="text-lg">
-                    {r.reaction}
-                </span>
-                ))}
-            </div>
         </div>
         {showSentence && (
           <blockquote className="relative mt-1 pl-3">
@@ -94,6 +93,12 @@ function HistoricalEntry({
             </p>
           </blockquote>
         )}
+      </div>
+      <div className="text-center text-2xl col-span-1">
+        {alexReaction || <span className="text-muted-foreground/50">-</span>}
+      </div>
+      <div className="text-center text-2xl col-span-1">
+        {amalieReaction || <span className="text-muted-foreground/50">-</span>}
       </div>
     </div>
   );
@@ -448,24 +453,33 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
               </div>
               <Button variant="outline" onClick={handleRandomSelect}>Random</Button>
             </div>
-            <ScrollArea className="flex-grow">
-              <div className="mt-4 flex flex-col gap-4 pr-4">
-                {historicalSentences.length > 0 ? (
-                  historicalSentences.map((entry) => (
-                    <HistoricalEntry
-                      key={entry.date.toISOString()}
-                      entry={entry}
-                      onSelect={handleHistoricalSelect}
-                      showSentence={!spoilerAlert}
-                    />
-                  ))
-                ) : (
-                  <p className="text-muted-foreground text-center">
-                    No memories found.
-                  </p>
-                )}
+            <div className="relative flex-grow">
+              <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm">
+                <div className="grid grid-cols-3 items-center gap-4 p-2 font-semibold text-muted-foreground border-b">
+                  <div className="col-span-1">Date</div>
+                  <div className="text-center col-span-1">Alex</div>
+                  <div className="text-center col-span-1">Amalie</div>
+                </div>
               </div>
-            </ScrollArea>
+              <ScrollArea className="h-[calc(100vh-200px)]">
+                <div className="mt-2 flex flex-col gap-1 pr-4">
+                  {historicalSentences.length > 0 ? (
+                    historicalSentences.map((entry) => (
+                      <HistoricalEntry
+                        key={entry.date.toISOString()}
+                        entry={entry}
+                        onSelect={handleHistoricalSelect}
+                        showSentence={!spoilerAlert}
+                      />
+                    ))
+                  ) : (
+                    <p className="text-muted-foreground text-center pt-8">
+                      No memories found.
+                    </p>
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
@@ -543,5 +557,3 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     </main>
   );
 }
-
-    
