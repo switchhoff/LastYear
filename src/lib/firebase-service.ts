@@ -1,20 +1,14 @@
 import {
-  getFirestore,
   doc,
   setDoc,
   getDoc,
   collection,
-  query,
-  orderBy,
   serverTimestamp,
   updateDoc,
-  arrayUnion,
-  arrayRemove,
   getDocs,
 } from 'firebase/firestore';
 import {
   setDocumentNonBlocking,
-  addDocumentNonBlocking,
   updateDocumentNonBlocking,
 } from '@/firebase/non-blocking-updates';
 import { initializeFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
@@ -23,11 +17,11 @@ import type { User } from 'firebase/auth';
 const { firestore: db } = initializeFirebase();
 
 export type ChatMessage = {
-  id: string;
+  // Messages won't have a unique ID when they are part of an array
   userId: string;
+  userEmail?: string;
   text: string;
   timestamp: any; // Allow Timestamp or ServerTimestamp
-  userEmail?: string;
 };
 
 export type UserReaction = {
@@ -41,6 +35,7 @@ export type Memory = {
     sentence: string;
     aiArtUrl: string;
     reactions: UserReaction[];
+    chatMessages?: ChatMessage[];
 }
 
 const getMemoryDocId = (date: Date): string => {
@@ -50,7 +45,7 @@ const getMemoryDocId = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-// Helper to ensure the parent memory document exists before writing to a subcollection.
+// Helper to ensure the parent memory document exists.
 const ensureMemoryDocExists = (memoryDate: Date, sentence: string) => {
   const memoryId = getMemoryDocId(memoryDate);
   const memoryRef = doc(db, 'memories', memoryId);
@@ -60,7 +55,8 @@ const ensureMemoryDocExists = (memoryDate: Date, sentence: string) => {
     date: memoryDate.toISOString().split('T')[0], // YYYY-MM-DD format
     sentence: sentence,
     aiArtUrl: "https://picsum.photos/seed/placeholder/600/400", // Placeholder URL
-    reactions: [], // Initialize with an empty array
+    reactions: [],
+    chatMessages: [],
   };
 
   // Use a non-blocking set with merge. This will create the doc if it doesn't exist,
@@ -82,16 +78,21 @@ export async function saveReaction(
   try {
     const memorySnap = await getDoc(memoryRef);
     if (!memorySnap.exists()) {
-      // If the memory doesn't exist, create it first.
-      ensureMemoryDocExists(memoryDate, sentence);
+      // If the memory doesn't exist, create it first. This is a blocking call.
+      const memoryData = {
+        id: memoryId,
+        date: memoryDate.toISOString().split('T')[0],
+        sentence: sentence,
+        aiArtUrl: "https://picsum.photos/seed/placeholder/600/400",
+        reactions: [],
+        chatMessages: [],
+      };
+      await setDoc(memoryRef, memoryData);
     }
     
-    // Remove any existing reaction from this user
-    // Firestore doesn't have a great way to update an element in an array,
-    // so we have to read the doc, modify the array, and write it back.
-    // For this app's scale, this is fine. For larger apps, a subcollection is better.
-    const memoryData = memorySnap.data() as Memory | undefined;
-    const existingReactions = memoryData?.reactions || [];
+    // Now perform the reaction update
+    const memoryData = (memorySnap.data() as Memory) || { reactions: [] };
+    const existingReactions = memoryData.reactions || [];
     const newReactions = existingReactions.filter(r => r.userId !== user.uid);
 
     if (reaction) {
@@ -110,7 +111,7 @@ export async function saveReaction(
   }
 }
 
-export function addChatMessage(
+export async function addChatMessage(
   user: User,
   memoryDate: Date,
   sentence: string,
@@ -118,27 +119,46 @@ export function addChatMessage(
 ) {
   if (!user) return;
 
-  ensureMemoryDocExists(memoryDate, sentence);
-
   const memoryId = getMemoryDocId(memoryDate);
-  const chatCollectionRef = collection(db, 'memories', memoryId, 'chat_messages');
+  const memoryRef = doc(db, 'memories', memoryId);
   
-  addDocumentNonBlocking(chatCollectionRef, {
-    userId: user.uid,
-    userEmail: user.email,
-    text,
-    timestamp: serverTimestamp(),
-  });
+  try {
+    const memorySnap = await getDoc(memoryRef);
+    if (!memorySnap.exists()) {
+      // If the memory doesn't exist, create it first.
+      const memoryData = {
+        id: memoryId,
+        date: memoryDate.toISOString().split('T')[0],
+        sentence: sentence,
+        aiArtUrl: "https://picsum.photos/seed/placeholder/600/400",
+        reactions: [],
+        chatMessages: [],
+      };
+      await setDoc(memoryRef, memoryData);
+    }
+
+    const newMessage: ChatMessage = {
+      userId: user.uid,
+      userEmail: user.email || 'Anonymous',
+      text,
+      timestamp: new Date(), // Use client-side timestamp for array
+    };
+    
+    const memoryData = (memorySnap.data() as Memory) || { chatMessages: [] };
+    const existingMessages = memoryData.chatMessages || [];
+    const newMessages = [...existingMessages, newMessage].sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+    updateDocumentNonBlocking(memoryRef, { chatMessages: newMessages });
+
+  } catch (error) {
+    const contextualError = new FirestorePermissionError({
+      operation: 'write',
+      path: memoryRef.path,
+    });
+    errorEmitter.emit('permission-error', contextualError);
+  }
 }
 
-export const getChatMessagesQuery = (memoryDate: Date) => {
-  const memoryId = getMemoryDocId(memoryDate);
-  const chatCollectionRef = collection(db, 'memories', memoryId, 'chat_messages');
-  return query(chatCollectionRef, orderBy('timestamp', 'asc'));
-};
-
-// This function is no longer a query, it just gets a document.
-// For consistency, we can have a query function for the document.
 export const getMemoryDocRef = (memoryDate: Date) => {
   const memoryId = getMemoryDocId(memoryDate);
   return doc(db, 'memories', memoryId);

@@ -33,14 +33,13 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   saveReaction,
   addChatMessage,
-  getChatMessagesQuery,
   getAllMemoryReactions,
   getMemoryDocRef,
   type ChatMessage,
   type UserReaction,
   type Memory,
 } from '@/lib/firebase-service';
-import { useUser, useCollection, useAuth, useMemoFirebase, useDoc } from '@/firebase';
+import { useUser, useAuth, useMemoFirebase, useDoc } from '@/firebase';
 
 type DailyContent = {
   date: Date;
@@ -161,24 +160,20 @@ function FeedbackSection({ content }: { content: DailyContent }) {
           </div>
         </TabsContent>
         <TabsContent value="journal">
-          <ChatSection content={content} />
+          <ChatSection content={content} memoryData={memoryData} />
         </TabsContent>
       </Tabs>
     </div>
   );
 }
 
-function ChatSection({ content }: { content: DailyContent }) {
+function ChatSection({ content, memoryData }: { content: DailyContent, memoryData: Memory | null }) {
   const { user } = useUser();
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  const messagesQuery = useMemoFirebase(
-    () => getChatMessagesQuery(content.yearAgoDate),
-    [content.yearAgoDate]
-  );
-  const { data: messages, isLoading } = useCollection<ChatMessage>(messagesQuery);
+  const messages = useMemo(() => memoryData?.chatMessages || [], [memoryData]);
   
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -186,10 +181,10 @@ function ChatSection({ content }: { content: DailyContent }) {
     }
   }, [messages]);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!newMessage.trim() || !user) return;
     setIsSending(true);
-    addChatMessage(user, content.yearAgoDate, content.sentence, newMessage);
+    await addChatMessage(user, content.yearAgoDate, content.sentence, newMessage);
     setNewMessage('');
     setIsSending(false);
   };
@@ -198,10 +193,9 @@ function ChatSection({ content }: { content: DailyContent }) {
     <div className="flex flex-col h-[400px] bg-muted/50 rounded-lg p-4">
       <ScrollArea className="flex-grow mb-4 pr-4" ref={scrollAreaRef}>
         <div className="flex flex-col gap-4">
-          {isLoading && <LoadingSpinner />}
-          {messages?.map((msg) => (
+          {messages?.map((msg, index) => (
             <div
-              key={msg.id}
+              key={index}
               className={cn(
                 'flex flex-col max-w-[75%] p-2 px-3 rounded-lg',
                 msg.userId === user?.uid

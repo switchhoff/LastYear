@@ -45,6 +45,13 @@
           "items": {
             "$ref": "#/entities/UserMemoryReaction"
           }
+        },
+        "chatMessages": {
+          "type": "array",
+          "description": "An array of chat messages for the memory.",
+          "items": {
+            "$ref": "#/entities/ChatMessage"
+          }
         }
       },
       "required": ["id", "date", "sentence", "aiArtUrl"]
@@ -105,10 +112,6 @@
     "/memories/{memoryId}": {
       "schema": { "$ref": "#/entities/Memory" },
       "description": "Stores shared memories. Any authenticated user can read and write."
-    },
-    "/memories/{memoryId}/chat_messages/{messageId}": {
-      "schema": { "$ref": "#/entities/ChatMessage" },
-      "description": "Stores chat messages for a shared memory. Any authenticated user can read and write."
     }
   }
 }
