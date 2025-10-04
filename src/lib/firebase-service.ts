@@ -51,16 +51,11 @@ const getMemoryDocId = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-// Helper to ensure the parent user and memory documents exist before writing to a subcollection.
+// Helper to ensure the parent memory document exists before writing to a subcollection.
 const ensureMemoryDocExists = (user: User, memoryDate: Date, sentence: string) => {
     if (!user) return;
 
-    // 1. Ensure the user document exists.
-    const userRef = doc(db, 'users', user.uid);
-    // This will create the user doc if it doesn't exist, or do nothing if it does.
-    setDocumentNonBlocking(userRef, { email: user.email }, { merge: true });
-
-    // 2. Ensure the memory document exists.
+    // The user document is now created in FirebaseProvider, so we only need to handle the memory doc.
     const memoryId = getMemoryDocId(memoryDate);
     const memoryRef = doc(db, 'users', user.uid, 'memories', memoryId);
     
@@ -71,8 +66,9 @@ const ensureMemoryDocExists = (user: User, memoryDate: Date, sentence: string) =
         aiArtUrl: "https://picsum.photos/seed/placeholder/600/400", // Placeholder URL
     };
 
-    // Use a non-blocking set with merge to create the doc if it doesn't exist.
-    // Add createdAt only on initial creation.
+    // Use a non-blocking set with merge. This will create the doc if it doesn't exist,
+    // or update it if it does. We add `createdAt` only on initial creation.
+    // The security rules should allow this as long as the user document exists.
     setDocumentNonBlocking(memoryRef, { ...memoryData, createdAt: serverTimestamp() }, { merge: true });
 };
 
