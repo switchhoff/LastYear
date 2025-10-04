@@ -19,7 +19,7 @@ const { firestore: db } = initializeFirebase();
 export type ChatMessage = {
   // Messages won't have a unique ID when they are part of an array
   userId: string;
-  userEmail?: string;
+  userName?: string;
   text: string;
   timestamp: any; // Allow Timestamp or ServerTimestamp
 };
@@ -46,23 +46,35 @@ const getMemoryDocId = (date: Date): string => {
 };
 
 // Helper to ensure the parent memory document exists.
-const ensureMemoryDocExists = (memoryDate: Date, sentence: string) => {
+const ensureMemoryDocExists = async (memoryDate: Date, sentence: string) => {
   const memoryId = getMemoryDocId(memoryDate);
   const memoryRef = doc(db, 'memories', memoryId);
 
-  const memoryData = {
-    id: memoryId,
-    date: memoryDate.toISOString().split('T')[0], // YYYY-MM-DD format
-    sentence: sentence,
-    aiArtUrl: "https://picsum.photos/seed/placeholder/600/400", // Placeholder URL
-    reactions: [],
-    chatMessages: [],
-  };
-
-  // Use a non-blocking set with merge. This will create the doc if it doesn't exist,
-  // or update it if it does, without overwriting fields unnecessarily.
-  setDocumentNonBlocking(memoryRef, memoryData, { merge: true });
+  try {
+    const memorySnap = await getDoc(memoryRef);
+    if (!memorySnap.exists()) {
+      const memoryData = {
+        id: memoryId,
+        date: memoryDate.toISOString().split('T')[0], // YYYY-MM-DD format
+        sentence: sentence,
+        aiArtUrl: "https://picsum.photos/seed/placeholder/600/400", // Placeholder URL
+        reactions: [],
+        chatMessages: [],
+      };
+      // This needs to be a blocking call to ensure the doc exists before proceeding.
+      await setDoc(memoryRef, memoryData);
+    }
+  } catch (error) {
+     const contextualError = new FirestorePermissionError({
+      operation: 'write',
+      path: memoryRef.path,
+    });
+    errorEmitter.emit('permission-error', contextualError);
+    // Re-throw the error to be caught by the calling function
+    throw error;
+  }
 };
+
 
 export async function saveReaction(
   user: User,
@@ -76,22 +88,13 @@ export async function saveReaction(
   const memoryRef = doc(db, 'memories', memoryId);
 
   try {
-    const memorySnap = await getDoc(memoryRef);
-    if (!memorySnap.exists()) {
-      // If the memory doesn't exist, create it first. This is a blocking call.
-      const memoryData = {
-        id: memoryId,
-        date: memoryDate.toISOString().split('T')[0],
-        sentence: sentence,
-        aiArtUrl: "https://picsum.photos/seed/placeholder/600/400",
-        reactions: [],
-        chatMessages: [],
-      };
-      await setDoc(memoryRef, memoryData);
-    }
+    // Ensure the memory document exists before trying to update it.
+    await ensureMemoryDocExists(memoryDate, sentence);
     
     // Now perform the reaction update
+    const memorySnap = await getDoc(memoryRef);
     const memoryData = (memorySnap.data() as Memory) || { reactions: [] };
+
     const existingReactions = memoryData.reactions || [];
     const newReactions = existingReactions.filter(r => r.userId !== user.uid);
 
@@ -121,32 +124,30 @@ export async function addChatMessage(
 
   const memoryId = getMemoryDocId(memoryDate);
   const memoryRef = doc(db, 'memories', memoryId);
-  
-  try {
-    const memorySnap = await getDoc(memoryRef);
-    if (!memorySnap.exists()) {
-      // If the memory doesn't exist, create it first.
-      const memoryData = {
-        id: memoryId,
-        date: memoryDate.toISOString().split('T')[0],
-        sentence: sentence,
-        aiArtUrl: "https://picsum.photos/seed/placeholder/600/400",
-        reactions: [],
-        chatMessages: [],
-      };
-      await setDoc(memoryRef, memoryData);
-    }
+  const userRef = doc(db, 'users', user.uid);
 
-    const newMessage: ChatMessage = {
+  try {
+    // Ensure the memory document exists before trying to update it.
+    await ensureMemoryDocExists(memoryDate, sentence);
+    
+    const userSnap = await getDoc(userRef);
+    const userName = userSnap.exists() ? userSnap.data().userName : user.email?.split('@')[0];
+
+    const newMessage: Omit<ChatMessage, 'timestamp'> & { timestamp: any } = {
       userId: user.uid,
-      userEmail: user.email || 'Anonymous',
+      userName: userName || 'Anonymous',
       text,
-      timestamp: new Date(), // Use client-side timestamp for array
+      timestamp: serverTimestamp(), // Use server timestamp for ordering
     };
     
+    const memorySnap = await getDoc(memoryRef);
     const memoryData = (memorySnap.data() as Memory) || { chatMessages: [] };
     const existingMessages = memoryData.chatMessages || [];
-    const newMessages = [...existingMessages, newMessage].sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+    // Note: serverTimestamp() will be null on the client. Sorting needs to happen on the client
+    // after fetching, or by querying with orderBy if they were a subcollection.
+    // For simplicity, we'll just add it. The sorting on display might be client-side.
+    const newMessages = [...existingMessages, newMessage];
 
     updateDocumentNonBlocking(memoryRef, { chatMessages: newMessages });
 

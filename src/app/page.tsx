@@ -203,7 +203,7 @@ function ChatSection({ content, memoryData }: { content: DailyContent, memoryDat
                   : 'bg-background self-start items-start'
               )}
             >
-              <span className="text-xs text-foreground/50">{msg.userEmail}</span>
+              <span className="text-xs text-foreground/50">{msg.userName}</span>
               <p>{msg.text}</p>
             </div>
           ))}

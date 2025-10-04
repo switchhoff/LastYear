@@ -2,7 +2,7 @@
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
-import { Firestore, doc, setDoc } from 'firebase/firestore';
+import { Firestore, doc, setDoc, getDoc } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 import { setDocumentNonBlocking } from './non-blocking-updates';
@@ -58,16 +58,32 @@ export const FirebaseContext = createContext<FirebaseContextState | undefined>(u
  * @param firestoreInstance The Firestore instance.
  * @param user The authenticated user object.
  */
-const updateUserDocument = (firestoreInstance: Firestore, user: User) => {
+const updateUserDocument = async (firestoreInstance: Firestore, user: User) => {
   const userDocRef = doc(firestoreInstance, 'users', user.uid);
-  // Using setDoc with merge:true is an "upsert" operation.
-  // It creates the document if it doesn't exist, or updates it if it does.
-  // This won't overwrite existing fields unless they are included in the new data.
-  const userData = {
-    id: user.uid,
-    email: user.email,
-  };
-  setDocumentNonBlocking(userDocRef, userData, { merge: true });
+
+  try {
+    const userDoc = await getDoc(userDocRef);
+    let userName = user.displayName;
+
+    // If the user doc doesn't exist or doesn't have a userName, create one.
+    if (!userDoc.exists() || !userDoc.data()?.userName) {
+      // If displayName is not set on the auth user, create a default one from email.
+      if (!userName && user.email) {
+        userName = user.email.split('@')[0];
+      }
+
+      const userData = {
+        id: user.uid,
+        email: user.email,
+        userName: userName || 'Anonymous',
+      };
+      
+      // Use set with merge to create or update without overwriting other fields.
+      setDocumentNonBlocking(userDocRef, userData, { merge: true });
+    }
+  } catch (error) {
+    console.error("Error updating user document:", error);
+  }
 };
 
 

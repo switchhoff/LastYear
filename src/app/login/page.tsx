@@ -25,6 +25,7 @@ import { LoadingSpinner } from '@/components/loading-spinner';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [userName, setUserName] = useState('');
   const [loading, setLoading] = useState(false);
   const auth = useAuth();
   const router = useRouter();
@@ -35,7 +36,17 @@ export default function LoginPage() {
     if (action === 'signIn') {
       initiateEmailSignIn(auth, email, password);
     } else {
-      initiateEmailSignUp(auth, email, password);
+      if (!userName) {
+        toast({
+          variant: 'destructive',
+          title: 'Username required',
+          description: 'Please enter a username to sign up.',
+        });
+        setLoading(false);
+        return;
+      }
+      // Pass username to sign up function
+      initiateEmailSignUp(auth, email, password, userName);
     }
     // Redirect immediately. The onAuthStateChanged listener will handle auth state.
     router.push('/');
@@ -94,6 +105,16 @@ export default function LoginPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
+               <div className="space-y-1">
+                <Label htmlFor="signup-username">Username</Label>
+                <Input
+                  id="signup-username"
+                  type="text"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  placeholder="Your Name"
+                />
+              </div>
               <div className="space-y-1">
                 <Label htmlFor="signup-email">Email</Label>
                 <Input

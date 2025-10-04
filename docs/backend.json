@@ -12,9 +12,13 @@
         "email": {
           "type": "string",
           "description": "The user's email address."
+        },
+        "userName": {
+          "type": "string",
+          "description": "The user's display name."
         }
       },
-      "required": ["id", "email"]
+      "required": ["id", "email", "userName"]
     },
     "Memory": {
       "title": "Memory",
@@ -81,9 +85,9 @@
           "type": "string",
           "description": "The user who sent the message."
         },
-        "userEmail": {
+        "userName": {
           "type": "string",
-          "description": "The email of the user who sent the message."
+          "description": "The display name of the user who sent the message."
         },
         "text": {
           "type": "string",
@@ -95,7 +99,7 @@
           "description": "The timestamp of when the message was sent."
         }
       },
-      "required": ["userId", "userEmail", "text", "timestamp"]
+      "required": ["userId", "userName", "text", "timestamp"]
     }
   },
   "auth": {

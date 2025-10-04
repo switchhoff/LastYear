@@ -1,6 +1,7 @@
 'use client';
 import {
   Auth,
+  updateProfile,
   signInAnonymously,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -19,8 +20,13 @@ export function initiateAnonymousSignIn(authInstance: Auth): void {
 }
 
 /** Initiate email/password sign-up (non-blocking). */
-export function initiateEmailSignUp(authInstance: Auth, email: string, password: string): void {
-  createUserWithEmailAndPassword(authInstance, email, password).catch((error) => {
+export function initiateEmailSignUp(authInstance: Auth, email: string, password: string, userName: string): void {
+  createUserWithEmailAndPassword(authInstance, email, password)
+  .then((userCredential) => {
+    // After user is created, update their profile with the displayName
+    return updateProfile(userCredential.user, { displayName: userName });
+  })
+  .catch((error) => {
     // This is where auth errors like 'auth/email-already-in-use' will be caught.
     // We are not creating a specific FirestorePermissionError here because
     // these are auth errors, not Firestore rules errors.
