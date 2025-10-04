@@ -8,11 +8,9 @@ import {
   writeBatch,
   type Firestore,
 } from 'firebase/firestore';
-import { initializeFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import type { User } from 'firebase/auth';
 import type { DatedSentence } from './daily-content';
-
-const { firestore: db } = initializeFirebase();
+import { errorEmitter, FirestorePermissionError } from '@/firebase';
 
 export type UserReaction = {
   userId: string;
@@ -35,13 +33,15 @@ export type Memory = {
 }
 
 const getMemoryDocId = (date: Date): string => {
-  const day = String(date.getUTCDate()).padStart(2, '0');
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const year = date.getUTCFullYear();
+  const dateObj = new Date(date);
+  const day = String(dateObj.getUTCDate()).padStart(2, '0');
+  const month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+  const year = dateObj.getUTCFullYear();
   return `${year}-${month}-${day}`;
 };
 
 export async function saveReaction(
+  firestore: Firestore,
   user: User,
   memoryDate: Date,
   reaction: string | null
@@ -49,12 +49,11 @@ export async function saveReaction(
   if (!user) return;
 
   const memoryId = getMemoryDocId(memoryDate);
-  const memoryRef = doc(db, 'memories', memoryId);
+  const memoryRef = doc(firestore, 'memories', memoryId);
 
   try {
     const memorySnap = await getDoc(memoryRef);
     if (!memorySnap.exists()) {
-      // This case should not be hit if ensureMemoryDocuments runs correctly.
       console.error("Attempted to react to a memory document that doesn't exist:", memoryId);
       return;
     }
@@ -81,6 +80,7 @@ export async function saveReaction(
 }
 
 export async function addChatMessage(
+  firestore: Firestore,
   user: User,
   memoryDate: Date,
   text: string
@@ -88,10 +88,10 @@ export async function addChatMessage(
   if (!user || !text.trim()) return;
 
   const memoryId = getMemoryDocId(memoryDate);
-  const memoryRef = doc(db, 'memories', memoryId);
+  const memoryRef = doc(firestore, 'memories', memoryId);
 
   try {
-    const userDocRef = doc(db, 'users', user.uid);
+    const userDocRef = doc(firestore, 'users', user.uid);
     const userDocSnap = await getDoc(userDocRef);
     const userName = userDocSnap.exists() ? userDocSnap.data().userName : 'Anonymous';
 
@@ -101,7 +101,6 @@ export async function addChatMessage(
       text: text,
     };
     
-    // Atomically add the new message to the "chatMessages" array field.
     await updateDoc(memoryRef, {
       chatMessages: arrayUnion(newMessage)
     });
@@ -117,35 +116,6 @@ export async function addChatMessage(
   }
 }
 
-
-export const getMemoryDocRef = (memoryDate: Date) => {
-  const memoryId = getMemoryDocId(memoryDate);
-  return doc(db, 'memories', memoryId);
-};
-
-
-export async function getAllMemoryReactions(
-  memoryDate: Date
-): Promise<UserReaction[]> {
-  try {
-    const memoryId = getMemoryDocId(memoryDate);
-    const memoryRef = doc(db, 'memories', memoryId);
-    const docSnap = await getDoc(memoryRef);
-    if (docSnap.exists()) {
-      return (docSnap.data() as Memory)?.reactions || [];
-    }
-    return [];
-  } catch (error) {
-    const memoryId = getMemoryDocId(memoryDate);
-    const contextualError = new FirestorePermissionError({
-      operation: 'get',
-      path: `memories/${memoryId}`,
-    });
-    errorEmitter.emit('permission-error', contextualError);
-    return []; // Return empty array on error
-  }
-}
-
 /**
  * Ensures that a Firestore document exists for every sentence in daily-content.
  * This is idempotent and can be called safely on every app load.
@@ -154,21 +124,18 @@ export async function ensureMemoryDocuments(firestore: Firestore, allSentences: 
     try {
         const batch = writeBatch(firestore);
         
-        const existingDocsPromises = allSentences.map(sentence => {
+        const memoryRefs = allSentences.map(sentence => {
             const memoryId = getMemoryDocId(sentence.date);
-            const memoryRef = doc(firestore, 'memories', memoryId);
-            return getDoc(memoryRef);
+            return doc(firestore, 'memories', memoryId);
         });
 
-        const existingDocsSnapshots = await Promise.all(existingDocsPromises);
+        const existingDocsSnapshots = await Promise.all(memoryRefs.map(ref => getDoc(ref)));
 
-        for (let i = 0; i < allSentences.length; i++) {
-            const sentence = allSentences[i];
-            const docSnapshot = existingDocsSnapshots[i];
-
+        existingDocsSnapshots.forEach((docSnapshot, index) => {
             if (!docSnapshot.exists()) {
+                const sentence = allSentences[index];
                 const memoryId = getMemoryDocId(sentence.date);
-                const memoryRef = doc(firestore, 'memories', memoryId);
+                const memoryRef = memoryRefs[index];
                 const newMemory: Memory = {
                     id: memoryId,
                     date: sentence.date.toISOString().split('T')[0],
@@ -179,7 +146,7 @@ export async function ensureMemoryDocuments(firestore: Firestore, allSentences: 
                 };
                 batch.set(memoryRef, newMemory);
             }
-        }
+        });
         
         await batch.commit();
     } catch (error) {
