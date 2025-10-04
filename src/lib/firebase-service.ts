@@ -23,11 +23,6 @@ export type UserMemoryChatMessage = {
   text: string;
 };
 
-export type UserMemory = {
-  userId: string;
-  sentence: string;
-}
-
 export type Memory = {
     id: string;
     date: string;
@@ -53,29 +48,26 @@ export async function saveUserSentence(
   if (!user) return;
 
   const memoryId = getMemoryDocId(date);
-  const userMemoryRef = doc(firestore, 'userMemories', memoryId, 'users', user.uid);
   const memoryRef = doc(firestore, 'memories', memoryId);
 
-  const userMemoryData: UserMemory = {
-    userId: user.uid,
-    sentence,
-  };
+  // Use dot notation to update a specific field in the map
+  const fieldPath = `userSentences.${user.uid}`;
+  const dataToUpdate = { [fieldPath]: sentence };
   
-  const batch = writeBatch(firestore);
-  batch.set(userMemoryRef, userMemoryData);
-  batch.set(memoryRef, { 
-    id: memoryId,
-    date: date.toISOString().split('T')[0],
-    userSentences: { [user.uid]: sentence }
-  }, { merge: true });
-
   try {
-    await batch.commit();
+     // Use setDoc with merge to create the doc if it doesn't exist, 
+     // or update it if it does. This handles both creation and update.
+    await setDoc(memoryRef, { 
+      id: memoryId,
+      date: date.toISOString().split('T')[0],
+      userSentences: { [user.uid]: sentence }
+    }, { merge: true });
+
   } catch (error) {
      const contextualError = new FirestorePermissionError({
       operation: 'write',
-      path: userMemoryRef.path,
-      requestResourceData: userMemoryData
+      path: memoryRef.path,
+      requestResourceData: dataToUpdate
     });
     errorEmitter.emit('permission-error', contextualError);
   }
@@ -171,7 +163,7 @@ export async function ensureMemoryDocuments(firestore: Firestore, allSentences: 
             const memorySnap = await getDoc(memoryRef);
 
             if (!memorySnap.exists()) {
-                const newMemory = {
+                const newMemory: Memory = {
                     id: memoryId,
                     date: sentence.date.toISOString().split('T')[0],
                     userSentences: {

@@ -27,7 +27,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { getAllSentences, type DatedSentence } from '@/lib/daily-content';
+import { getAllSentences } from '@/lib/daily-content';
 import { getMemorableDate, type MemorableDate } from '@/lib/memorable-dates';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -55,7 +55,12 @@ type DailyContent = {
   isToday: boolean;
 };
 
-type HistoricalEntryWithReactions = DatedSentence & { reactions: UserReaction[]; chatMessages: UserMemoryChatMessage[] };
+type HistoricalEntryWithReactions = { 
+  date: Date,
+  sentence: string,
+  reactions: UserReaction[]; 
+  chatMessages: UserMemoryChatMessage[] 
+};
 
 const ALEX_USER_ID = '1xcBSDAluySuyeLwX5TEQnuiPMA2';
 const AMALIE_USER_ID = 'SFsKmCQM9NZi7Drmsb4pNBtLJ6m1';
@@ -330,16 +335,17 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     const memoryId = getMemoryDocId(content.memoryDate);
     return doc(firestore, 'memories', memoryId);
   }, [firestore, content]);
-  
-  const userMemoryDocRef = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    // We always save to today's date for user memories
-    const memoryId = getMemoryDocId(new Date());
-    return doc(firestore, 'userMemories', memoryId, 'users', user.uid);
-  }, [firestore, user]);
 
   const { data: memoryData } = useDoc<Memory>(memoryDocRef);
-  const { data: userMemoryData } = useDoc<{sentence: string}>(userMemoryDocRef);
+  
+  const userSentenceForToday = useMemo(() => {
+    if (!memoryData || !user) return '';
+    return memoryData.userSentences?.[user.uid] || '';
+  }, [memoryData, user]);
+  
+  useEffect(() => {
+    setNewUserSentence(userSentenceForToday);
+  }, [userSentenceForToday]);
 
   const reactions = useMemo(() => memoryData?.reactions || [], [memoryData]);
   const userReaction = useMemo(() => {
@@ -456,10 +462,6 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   useEffect(() => {
     fetchTodaysContent();
   }, [fetchTodaysContent]);
-  
-  useEffect(() => {
-    setNewUserSentence(userMemoryData?.sentence || '');
-  }, [userMemoryData]);
 
   useEffect(() => {
     if (!loading && content) {
@@ -509,7 +511,8 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
                 setMode('view');
               } else {
                 setMode('add');
-                setNewUserSentence(userMemoryData?.sentence || '');
+                // Ensure the sentence is ready for editing
+                setNewUserSentence(userSentenceForToday);
               }
             }}
           >
@@ -738,5 +741,3 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     </main>
   );
 }
-
-    
