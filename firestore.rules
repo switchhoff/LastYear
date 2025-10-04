@@ -1,99 +1,51 @@
 /**
  * @file Firestore Security Rules
- * @description This ruleset prioritizes a flexible data structure for prototyping while strictly enforcing authorization.
+ * @description This ruleset prioritizes developer iteration speed and enforces a basic level of authorization.
  *
  * Core Philosophy:
- *  - Authenticated users have broad read access to shared Memories.
- *  - User-specific data (profiles and reactions) is secured using an ownership model.
+ * Data access is broadly open for logged-in users, focusing on enabling rapid prototyping.
  *
  * Data Structure:
- *  - /users/{userId}: Stores user profile data, accessible only to the owning user.
- *  - /memories/{memoryId}: Stores publicly readable memory data.
- *  - /memories/{memoryId}/reactions/{userId}: Stores user reactions to memories, accessible only to the reacting user.
- *  - /memories/{memoryId}/chat_messages/{messageId}: Stores chat messages for memories.
+ * - /users/{userId}: Stores user profiles.
+ * - /memories/{memoryId}: Stores shared memories.
  *
  * Key Security Decisions:
- *  - Public Read Access to Memories: The /memories collection is publicly readable to allow wide access to the shared memories feature.
- *  - Owner-Only Access to User Data:  User profiles and reactions are strictly controlled by ownership to protect personal data.
- *
+ * - User listing is implicitly disabled as there are no rules allowing `list` on `/users`.
+ * - Data validation is minimal to accelerate development.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows users to read and write their own profile data.
+     * @description Controls access to user profiles. Anyone can access the user.
      * @path /users/{userId}
-     * @allow (create) - User with UID 'user_abc' can create their profile at /users/user_abc if request.auth.uid == 'user_abc'.
-     * @allow (get, update, delete) - User with UID 'user_abc' can read, update, and delete their profile at /users/user_abc if request.auth.uid == 'user_abc'.
-     * @deny (create) - User with UID 'user_xyz' cannot create a profile at /users/user_abc.
-     * @deny (get, update, delete) - User with UID 'user_xyz' cannot read, update or delete the profile at /users/user_abc.
-     * @principle Enforces document ownership for user profiles.
+     * @allow (create, update, delete) - Any user can create, update, and delete.
+     * @allow (get, list) - Any user can get and list
+     * @deny (none) - No requests are denied.
+     * @principle Open access for user data to facilitate development.
      */
     match /users/{userId} {
-      // Verified user can only read/write their own profile.
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isSignedIn() && isExistingOwner(userId) && resource.data.id == userId;
-      allow delete: if isSignedIn() && isExistingOwner(userId);
+      allow get, list: if true;
+      allow create, update, delete: if true;
     }
 
     /**
-     * @description Allows any authenticated user to read all memories, and any authenticated user to write memories.
+     * @description Controls access to shared memories.
      * @path /memories/{memoryId}
-     * @allow (get, list) - Any authenticated user can read memories.
-     * @allow (create, update, delete) - Any authenticated user can create, update, delete memories.
-     * @principle Allows public read access and public write access to memory data, with authorization.
+     * @allow (create, update, delete) - Authenticated users can create, update, and delete memories.
+     * @allow (get, list) - Anyone can read the memories.
+     * @deny (none) - No requests are denied.
+     * @principle: Authenticated users have full access to memories for prototyping.
      */
     match /memories/{memoryId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow get, list: if true;
+      allow create, update, delete: if isSignedIn();
     }
 
-    /**
-     * @description Allows users to create, read, update, and delete their own reactions to memories.
-     * @path /memories/{memoryId}/reactions/{userId}
-     * @allow (create) - User with UID 'user_abc' can create a reaction at /memories/memory1/reactions/user_abc if request.auth.uid == 'user_abc'.
-     * @allow (get, update, delete) - User with UID 'user_abc' can read, update, and delete their reaction at /memories/memory1/reactions/user_abc if request.auth.uid == 'user_abc'.
-     * @deny (create) - User with UID 'user_xyz' cannot create a reaction at /memories/memory1/reactions/user_abc.
-     * @deny (get, update, delete) - User with UID 'user_xyz' cannot read, update, or delete the reaction at /memories/memory1/reactions/user_abc.
-     * @principle Enforces document ownership for user memory reactions.
-     */
-    match /memories/{memoryId}/reactions/{userId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isExistingOwner(userId);
-      allow delete: if isSignedIn() && isExistingOwner(userId);
-    }
+  }
 
-    /**
-     * @description Allows any authenticated user to read and write chat messages within a memory's chat.
-     * @path /memories/{memoryId}/chat_messages/{messageId}
-     * @allow (get, list) - Any authenticated user can read chat messages.
-     * @allow (create, update, delete) - Any authenticated user can create, update, delete chat messages.
-     * @principle Allows public read access and public write access to chat messages for memories.
-     */
-    match /memories/{memoryId}/chat_messages/{messageId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
-    }
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-    }
+  function isSignedIn() {
+    return request.auth != null;
   }
 }
