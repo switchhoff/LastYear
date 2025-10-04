@@ -1,3 +1,4 @@
+
 import {
   doc,
   setDoc,
@@ -17,9 +18,8 @@ import type { User } from 'firebase/auth';
 const { firestore: db } = initializeFirebase();
 
 export type ChatMessage = {
-  // Messages won't have a unique ID when they are part of an array
   userId: string;
-  userName?: string;
+  userName: string;
   text: string;
   timestamp: any; // Allow Timestamp or ServerTimestamp
 };
@@ -46,14 +46,14 @@ const getMemoryDocId = (date: Date): string => {
 };
 
 // Helper to ensure the parent memory document exists.
-const ensureMemoryDocExists = async (memoryDate: Date, sentence: string) => {
+const ensureMemoryDocExists = async (user: User, memoryDate: Date, sentence: string) => {
   const memoryId = getMemoryDocId(memoryDate);
   const memoryRef = doc(db, 'memories', memoryId);
 
   try {
     const memorySnap = await getDoc(memoryRef);
     if (!memorySnap.exists()) {
-      const memoryData = {
+      const memoryData: Memory = {
         id: memoryId,
         date: memoryDate.toISOString().split('T')[0], // YYYY-MM-DD format
         sentence: sentence,
@@ -89,11 +89,11 @@ export async function saveReaction(
 
   try {
     // Ensure the memory document exists before trying to update it.
-    await ensureMemoryDocExists(memoryDate, sentence);
-    
+    await ensureMemoryDocExists(user, memoryDate, sentence);
+
     // Now perform the reaction update
     const memorySnap = await getDoc(memoryRef);
-    const memoryData = (memorySnap.data() as Memory) || { reactions: [] };
+    const memoryData = (memorySnap.data() as Memory) || { reactions: [], chatMessages: [] };
 
     const existingReactions = memoryData.reactions || [];
     const newReactions = existingReactions.filter(r => r.userId !== user.uid);
@@ -124,33 +124,40 @@ export async function addChatMessage(
 
   const memoryId = getMemoryDocId(memoryDate);
   const memoryRef = doc(db, 'memories', memoryId);
-  const userRef = doc(db, 'users', user.uid);
 
   try {
-    // Ensure the memory document exists before trying to update it.
-    await ensureMemoryDocExists(memoryDate, sentence);
-    
+    // This function now handles both creation and update, so we don't need a separate ensureExists call.
+    const userRef = doc(db, 'users', user.uid);
     const userSnap = await getDoc(userRef);
-    const userName = userSnap.exists() ? userSnap.data().userName : user.email?.split('@')[0];
+    const userName = userSnap.exists() ? userSnap.data().userName : (user.displayName || user.email?.split('@')[0]);
 
-    const newMessage: Omit<ChatMessage, 'timestamp'> & { timestamp: any } = {
+    const newMessage: ChatMessage = {
       userId: user.uid,
       userName: userName || 'Anonymous',
       text,
       timestamp: serverTimestamp(), // Use server timestamp for ordering
     };
-    
+
     const memorySnap = await getDoc(memoryRef);
-    const memoryData = (memorySnap.data() as Memory) || { chatMessages: [] };
-    const existingMessages = memoryData.chatMessages || [];
-
-    // Note: serverTimestamp() will be null on the client. Sorting needs to happen on the client
-    // after fetching, or by querying with orderBy if they were a subcollection.
-    // For simplicity, we'll just add it. The sorting on display might be client-side.
-    const newMessages = [...existingMessages, newMessage];
-
-    updateDocumentNonBlocking(memoryRef, { chatMessages: newMessages });
-
+    
+    if (memorySnap.exists()) {
+      // Document exists, update it
+      const memoryData = (memorySnap.data() as Memory) || { chatMessages: [] };
+      const existingMessages = memoryData.chatMessages || [];
+      const newMessages = [...existingMessages, newMessage];
+      updateDocumentNonBlocking(memoryRef, { chatMessages: newMessages });
+    } else {
+      // Document does not exist, create it
+      const newMemoryData: Memory = {
+        id: memoryId,
+        date: memoryDate.toISOString().split('T')[0],
+        sentence: sentence,
+        aiArtUrl: "https://picsum.photos/seed/placeholder/600/400",
+        reactions: [],
+        chatMessages: [newMessage],
+      };
+      setDocumentNonBlocking(memoryRef, newMemoryData, {});
+    }
   } catch (error) {
     const contextualError = new FirestorePermissionError({
       operation: 'write',
