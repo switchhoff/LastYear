@@ -246,11 +246,13 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
 
     memoriesMap.forEach((memory, id) => {
         const dateParts = id.split('-').map(Number);
+        // Create date in local time from Y-M-D
         const memoryDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
         memoryDate.setHours(0,0,0,0);
         
         const displayDate = new Date(memoryDate);
         displayDate.setFullYear(displayDate.getFullYear() + 1);
+        displayDate.setHours(0,0,0,0);
 
         if (displayDate <= today) {
             const sentence = Object.values(memory.userSentences || {})[0] || (memory as any).sentence || "No sentence found.";
@@ -430,11 +432,9 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
       setShowContent(false);
       setContent(null);
 
-      // Use local time, setting hours to 0 to avoid timezone shifts
-      const localTargetDate = new Date(targetDate);
-      localTargetDate.setHours(0, 0, 0, 0);
+      const displayDate = new Date(targetDate);
+      displayDate.setHours(0, 0, 0, 0);
 
-      const displayDate = localTargetDate;
       const memoryDate = new Date(displayDate);
       memoryDate.setFullYear(displayDate.getFullYear() - 1);
       
