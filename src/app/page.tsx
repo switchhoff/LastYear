@@ -340,12 +340,36 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   
   const userSentenceForToday = useMemo(() => {
     if (!memoryData || !user) return '';
+    // This needs to check against the *current date* memory, not the historical one.
+    // This will be handled by fetching today's memory data separately when in 'add' mode.
     return memoryData.userSentences?.[user.uid] || '';
   }, [memoryData, user]);
   
+  // New state to hold today's memory for the 'add' mode
+  const [todayMemoryData, setTodayMemoryData] = useState<Memory | null>(null);
+  const todayDocId = useMemo(() => getMemoryDocId(new Date()), []);
+  const todayMemoryDocRef = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return doc(firestore, 'memories', todayDocId);
+  }, [firestore, todayDocId]);
+  const { data: todayMemory } = useDoc<Memory>(todayMemoryDocRef);
+
   useEffect(() => {
-    setNewUserSentence(userSentenceForToday);
-  }, [userSentenceForToday]);
+    if (todayMemory) {
+      setTodayMemoryData(todayMemory);
+    }
+  }, [todayMemory]);
+
+  const userSentenceFromToday = useMemo(() => {
+    if (!todayMemoryData || !user) return '';
+    return todayMemoryData.userSentences?.[user.uid] || '';
+  }, [todayMemoryData, user]);
+
+  useEffect(() => {
+    if (mode === 'add') {
+      setNewUserSentence(userSentenceFromToday);
+    }
+  }, [mode, userSentenceFromToday]);
 
   const reactions = useMemo(() => memoryData?.reactions || [], [memoryData]);
   const userReaction = useMemo(() => {
@@ -488,7 +512,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   };
 
   const handleSaveSentence = async () => {
-    if (!user || !firestore || !content || !newUserSentence.trim()) return;
+    if (!user || !firestore || !newUserSentence.trim()) return;
     setIsSending(true);
     // Always save for *today's* date
     await saveUserSentence(firestore, user, new Date(), newUserSentence);
@@ -511,8 +535,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
                 setMode('view');
               } else {
                 setMode('add');
-                // Ensure the sentence is ready for editing
-                setNewUserSentence(userSentenceForToday);
+                setNewUserSentence(userSentenceFromToday);
               }
             }}
           >
@@ -741,3 +764,5 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     </main>
   );
 }
+
+    
