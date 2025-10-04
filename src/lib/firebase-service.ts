@@ -54,7 +54,6 @@ export async function saveReaction(
 
   try {
     const memorySnap = await getDoc(memoryRef);
-    const userReaction: UserReaction = { userId: user.uid, reaction: reaction || '' };
 
     if (memorySnap.exists()) {
       // Document exists, update the reactions array.
@@ -75,7 +74,7 @@ export async function saveReaction(
         });
       }
     } else {
-      // Document doesn't exist, create it.
+      // Document doesn't exist, create it, but only if they are adding a reaction
       if (reaction) {
         const newMemory: Memory = {
           id: memoryId,

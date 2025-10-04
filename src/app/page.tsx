@@ -203,7 +203,7 @@ function ChatSection({ content, memoryData }: { content: DailyContent, memoryDat
                   : 'bg-background self-start items-start'
               )}
             >
-              <span className="text-xs text-foreground/50">{msg.userName}</span>
+              <span className="text-xs text-muted-foreground">{msg.userName}</span>
               <p>{msg.text}</p>
             </div>
           ))}
@@ -234,12 +234,40 @@ function ChatSection({ content, memoryData }: { content: DailyContent, memoryDat
 function AuthWrapper({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
-
+  const [historicalSentences, setHistoricalSentences] = useState<HistoricalEntryWithReactions[]>([]);
+  const allSentences = useMemo(() => getAllSentences(), []);
+  
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.push('/login');
     }
   }, [user, isUserLoading, router]);
+
+  useEffect(() => {
+    async function fetchHistoricalData() {
+        if (!user) return; // Don't fetch if user is not logged in
+
+        const today = new Date();
+        const oneYearAgo = new Date(Date.UTC(today.getUTCFullYear() - 1, today.getUTCMonth(), today.getUTCDate()));
+        
+        const relevantSentences = allSentences.filter(entry => {
+            const entryDate = new Date(entry.date);
+            return entryDate.getTime() <= oneYearAgo.getTime();
+        });
+
+        const sentencesWithReactions = await Promise.all(
+            relevantSentences.map(async (entry) => {
+                const reactions = await getAllMemoryReactions(entry.date);
+                return { ...entry, reactions };
+            })
+        );
+        setHistoricalSentences(sentencesWithReactions);
+    }
+    if (user) {
+        fetchHistoricalData();
+    }
+  }, [allSentences, user]);
+
 
   if (isUserLoading || !user) {
     return (
@@ -250,19 +278,19 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return React.cloneElement(children as React.ReactElement, { historicalSentences });
 }
 
 
 export default function Home() {
   return (
     <AuthWrapper>
-      <MainContent />
+      <MainContent historicalSentences={[]} />
     </AuthWrapper>
   );
 }
 
-function MainContent() {
+function MainContent({ historicalSentences }: { historicalSentences: HistoricalEntryWithReactions[] }) {
   const [content, setContent] = useState<DailyContent | null>(null);
   const [loading, setLoading] = useState(true);
   const [showContent, setShowContent] = useState(false);
@@ -270,12 +298,9 @@ function MainContent() {
   const [spoilerAlert, setSpoilerAlert] = useState(true);
   const [isViewingHistorical, setIsViewingHistorical] = useState(false);
   const [showFeedback, setShowFeedback] = useState(true);
-  const [historicalSentences, setHistoricalSentences] = useState<HistoricalEntryWithReactions[]>([]);
   const { toast } = useToast();
   const auth = useAuth();
   
-  const allSentences = useMemo(() => getAllSentences(), []);
-
   const fetchContent = useCallback(async (date: Date) => {
     try {
       setLoading(true);
@@ -338,28 +363,6 @@ function MainContent() {
   useEffect(() => {
     fetchTodaysContent();
   }, [fetchTodaysContent]);
-
-  useEffect(() => {
-    async function fetchHistoricalData() {
-        const today = new Date();
-        const oneYearAgo = new Date(Date.UTC(today.getUTCFullYear() - 1, today.getUTCMonth(), today.getUTCDate()));
-        
-        const relevantSentences = allSentences.filter(entry => {
-            const entryDate = new Date(entry.date);
-            return entryDate.getTime() <= oneYearAgo.getTime();
-        });
-
-        const sentencesWithReactions = await Promise.all(
-            relevantSentences.map(async (entry) => {
-                const reactions = await getAllMemoryReactions(entry.date);
-                return { ...entry, reactions };
-            })
-        );
-        setHistoricalSentences(sentencesWithReactions);
-    }
-    fetchHistoricalData();
-  }, [allSentences]);
-
 
   useEffect(() => {
     if (!loading && content) {
