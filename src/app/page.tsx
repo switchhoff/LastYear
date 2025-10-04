@@ -253,7 +253,6 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
         displayDate.setUTCFullYear(displayDate.getUTCFullYear() + 1);
 
         if (displayDate <= todayUTC) {
-            // Fallback for old data structure
             const sentence = Object.values(memory.userSentences || {})[0] || (memory as any).sentence || "No sentence found.";
             
             combinedEntries.push({
@@ -367,12 +366,9 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   
   const effectiveSentence = useMemo(() => {
     if (!memoryData) return null;
-    // New structure: check userSentences map first
     if (memoryData.userSentences && Object.keys(memoryData.userSentences).length > 0) {
-      // Simple logic to get the first available sentence. Can be improved.
       return Object.values(memoryData.userSentences)[0];
     }
-    // Fallback to old structure
     if ((memoryData as any).sentence) {
       return (memoryData as any).sentence;
     }
@@ -387,14 +383,12 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     let newEmojis = shuffled.slice(0, 5);
 
     if (preserveSpot && currentReaction) {
-        // Try to keep the current reaction in the same spot if it exists in the old list
         const currentReactionIndex = displayedEmojis.indexOf(currentReaction);
         if (currentReactionIndex !== -1) {
-            newEmojis = newEmojis.filter(e => e !== currentReaction); // remove duplicates
+            newEmojis = newEmojis.filter(e => e !== currentReaction); 
             newEmojis.splice(currentReactionIndex, 0, currentReaction);
-            setDisplayedEmojis(newEmojis.slice(0,5)); // ensure it's still 5
+            setDisplayedEmojis(newEmojis.slice(0,5)); 
         } else {
-             // If not in old list, just replace a random one
              if (!newEmojis.includes(currentReaction)) {
                 newEmojis[Math.floor(Math.random() * newEmojis.length)] = currentReaction;
              }
@@ -410,7 +404,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
 
 
   useEffect(() => {
-    if (content) { // Generate emojis when content is loaded
+    if (content) {
       generateEmojis(userReaction, false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -437,7 +431,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
       
       const displayDate = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate()));
       const memoryDate = new Date(displayDate);
-      memoryDate.setUTCFullYear(displayDate.getUTCFullYear() - 1);
+      memoryDate.setUTCFullYear(displayDate.getUTCFullYear() + 1);
       
       const today = new Date();
       const todayUTC = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
@@ -510,7 +504,6 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   const handleSaveSentence = async () => {
     if (!user || !firestore || !newUserSentence.trim()) return;
     setIsSending(true);
-    // Always save for *today's* date
     await saveUserSentence(firestore, user, new Date(), newUserSentence);
     setIsSending(false);
     setMode('view');
@@ -627,7 +620,16 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
               showContent && 'animate-fade-in'
             )}
           >
-            <div className="flex flex-col gap-2 mb-24">
+            <div className="flex flex-col gap-2 mb-24 items-center">
+              {isViewingHistorical && (
+                <Button
+                  variant="ghost"
+                  onClick={fetchTodaysContent}
+                  className="mb-2"
+                >
+                  Back to today...
+                </Button>
+              )}
               <div className="flex items-center justify-center gap-2">
                 <p className="text-md md:text-lg text-foreground/80">
                   {content.dateString}
@@ -748,15 +750,8 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
           </div>
         )}
       </div>
-      {isViewingHistorical && !loading && (
-        <Button
-          variant="ghost"
-          onClick={fetchTodaysContent}
-          className="absolute bottom-8 animate-fade-in"
-        >
-          Back to today...
-        </Button>
-      )}
     </main>
   );
 }
+
+    
