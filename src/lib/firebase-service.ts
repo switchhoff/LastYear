@@ -2,16 +2,20 @@ import {
   getFirestore,
   doc,
   setDoc,
-  getDocs,
+  getDoc,
   collection,
   query,
   orderBy,
   serverTimestamp,
-  where,
+  updateDoc,
+  arrayUnion,
+  arrayRemove,
+  getDocs,
 } from 'firebase/firestore';
 import {
   setDocumentNonBlocking,
   addDocumentNonBlocking,
+  updateDocumentNonBlocking,
 } from '@/firebase/non-blocking-updates';
 import { initializeFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import type { User } from 'firebase/auth';
@@ -31,6 +35,14 @@ export type UserReaction = {
   reaction: string;
 };
 
+export type Memory = {
+    id: string;
+    date: string;
+    sentence: string;
+    aiArtUrl: string;
+    reactions: UserReaction[];
+}
+
 const getMemoryDocId = (date: Date): string => {
   const day = String(date.getUTCDate()).padStart(2, '0');
   const month = String(date.getUTCMonth() + 1).padStart(2, '0');
@@ -48,6 +60,7 @@ const ensureMemoryDocExists = (memoryDate: Date, sentence: string) => {
     date: memoryDate.toISOString().split('T')[0], // YYYY-MM-DD format
     sentence: sentence,
     aiArtUrl: "https://picsum.photos/seed/placeholder/600/400", // Placeholder URL
+    reactions: [], // Initialize with an empty array
   };
 
   // Use a non-blocking set with merge. This will create the doc if it doesn't exist,
@@ -55,7 +68,7 @@ const ensureMemoryDocExists = (memoryDate: Date, sentence: string) => {
   setDocumentNonBlocking(memoryRef, memoryData, { merge: true });
 };
 
-export function saveReaction(
+export async function saveReaction(
   user: User,
   memoryDate: Date,
   sentence: string,
@@ -63,18 +76,38 @@ export function saveReaction(
 ) {
   if (!user) return;
 
-  ensureMemoryDocExists(memoryDate, sentence);
-
   const memoryId = getMemoryDocId(memoryDate);
-  // Each user has their own document in the reactions subcollection, identified by their UID.
-  const reactionRef = doc(db, 'memories', memoryId, 'reactions', user.uid);
-  
-  // If the reaction is null, it means the user is removing their reaction.
-  // We can just set an empty object or a specific field to indicate no reaction.
-  // For simplicity, we'll save the reaction, and null will clear it in the UI logic.
-  const dataToSave = { userId: user.uid, reaction };
-  
-  setDocumentNonBlocking(reactionRef, dataToSave, { merge: true });
+  const memoryRef = doc(db, 'memories', memoryId);
+
+  try {
+    const memorySnap = await getDoc(memoryRef);
+    if (!memorySnap.exists()) {
+      // If the memory doesn't exist, create it first.
+      ensureMemoryDocExists(memoryDate, sentence);
+    }
+    
+    // Remove any existing reaction from this user
+    // Firestore doesn't have a great way to update an element in an array,
+    // so we have to read the doc, modify the array, and write it back.
+    // For this app's scale, this is fine. For larger apps, a subcollection is better.
+    const memoryData = memorySnap.data() as Memory | undefined;
+    const existingReactions = memoryData?.reactions || [];
+    const newReactions = existingReactions.filter(r => r.userId !== user.uid);
+
+    if (reaction) {
+      newReactions.push({ userId: user.uid, reaction });
+    }
+    
+    // Use a non-blocking update to set the new reactions array.
+    updateDocumentNonBlocking(memoryRef, { reactions: newReactions });
+
+  } catch (error) {
+     const contextualError = new FirestorePermissionError({
+      operation: 'write',
+      path: memoryRef.path,
+    });
+    errorEmitter.emit('permission-error', contextualError);
+  }
 }
 
 export function addChatMessage(
@@ -104,28 +137,29 @@ export const getChatMessagesQuery = (memoryDate: Date) => {
   return query(chatCollectionRef, orderBy('timestamp', 'asc'));
 };
 
-export const getMemoryReactionsQuery = (memoryDate: Date) => {
+// This function is no longer a query, it just gets a document.
+// For consistency, we can have a query function for the document.
+export const getMemoryDocRef = (memoryDate: Date) => {
   const memoryId = getMemoryDocId(memoryDate);
-  const reactionsRef = collection(db, 'memories', memoryId, 'reactions');
-  // Return the query itself to be used with useCollection
-  return query(reactionsRef, where('reaction', '!=', null));
+  return doc(db, 'memories', memoryId);
 };
+
 
 export async function getAllMemoryReactions(
   memoryDate: Date
 ): Promise<UserReaction[]> {
+  const memoryId = getMemoryDocId(memoryDate);
+  const memoryRef = doc(db, 'memories', memoryId);
   try {
-    const reactionsQuery = getMemoryReactionsQuery(memoryDate);
-    const querySnapshot = await getDocs(reactionsQuery);
-    const reactions = querySnapshot.docs.map(
-      (doc) => doc.data() as UserReaction
-    );
-    return reactions;
+    const docSnap = await getDoc(memoryRef);
+    if (docSnap.exists()) {
+      return (docSnap.data() as Memory)?.reactions || [];
+    }
+    return [];
   } catch (error) {
-    const memoryId = getMemoryDocId(memoryDate);
     const contextualError = new FirestorePermissionError({
-      operation: 'list',
-      path: `memories/${memoryId}/reactions`,
+      operation: 'get',
+      path: `memories/${memoryId}`,
     });
     errorEmitter.emit('permission-error', contextualError);
     return []; // Return empty array on error

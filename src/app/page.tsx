@@ -34,12 +34,13 @@ import {
   saveReaction,
   addChatMessage,
   getChatMessagesQuery,
-  getMemoryReactionsQuery,
   getAllMemoryReactions,
+  getMemoryDocRef,
   type ChatMessage,
   type UserReaction,
+  type Memory,
 } from '@/lib/firebase-service';
-import { useUser, useCollection, useAuth, useMemoFirebase } from '@/firebase';
+import { useUser, useCollection, useAuth, useMemoFirebase, useDoc } from '@/firebase';
 
 type DailyContent = {
   date: Date;
@@ -105,16 +106,18 @@ function FeedbackSection({ content }: { content: DailyContent }) {
   const { user } = useUser();
   const [isSending, setIsSending] = useState(false);
   
-  const memoryReactionsQuery = useMemoFirebase(() => {
+  const memoryDocRef = useMemoFirebase(() => {
     if (!content.yearAgoDate) return null;
-    return getMemoryReactionsQuery(content.yearAgoDate);
+    return getMemoryDocRef(content.yearAgoDate);
   }, [content.yearAgoDate]);
 
-  const { data: reactionsData } = useCollection<UserReaction>(memoryReactionsQuery);
+  const { data: memoryData } = useDoc<Memory>(memoryDocRef);
+  
+  const reactions = useMemo(() => memoryData?.reactions || [], [memoryData]);
 
   const userReaction = useMemo(() => {
-    return reactionsData?.find((r) => r.userId === user?.uid)?.reaction || null;
-  }, [reactionsData, user?.uid]);
+    return reactions.find((r) => r.userId === user?.uid)?.reaction || null;
+  }, [reactions, user?.uid]);
 
   const displayedEmojis = useMemo(() => {
     if (userReaction) {
@@ -126,10 +129,12 @@ function FeedbackSection({ content }: { content: DailyContent }) {
     return shuffled.slice(0, 5);
   }, [userReaction]);
 
-  const handleReact = (emoji: string) => {
+  const handleReact = async (emoji: string) => {
     if (!user) return;
+    setIsSending(true);
     const newEmoji = userReaction === emoji ? null : emoji;
-    saveReaction(user, content.yearAgoDate, content.sentence, newEmoji);
+    await saveReaction(user, content.yearAgoDate, content.sentence, newEmoji);
+    setIsSending(false);
   };
 
   return (
@@ -495,8 +500,6 @@ export default function Home() {
               >
                 <path d="M6 10H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" />
                 <path d="M6 14H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2h-2" />
-                <path d="M6 6h.01" />
-                <path d="M6 18h.01" />
                 <path d="m13 6-4 6h6l-4 6" />
               </svg>
               <h2 className="text-2xl font-semibold">Something went wrong</h2>

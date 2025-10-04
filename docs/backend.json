@@ -38,6 +38,13 @@
           "type": "string",
           "format": "uri",
           "description": "URL of the AI-generated stick figure art."
+        },
+        "reactions": {
+          "type": "array",
+          "description": "An array of user reactions to the memory.",
+          "items": {
+            "$ref": "#/entities/UserMemoryReaction"
+          }
         }
       },
       "required": ["id", "date", "sentence", "aiArtUrl"]
@@ -97,11 +104,7 @@
     },
     "/memories/{memoryId}": {
       "schema": { "$ref": "#/entities/Memory" },
-      "description": "Stores shared memories that any authenticated user can read and write to."
-    },
-    "/memories/{memoryId}/reactions/{userId}": {
-      "schema": { "$ref": "#/entities/UserMemoryReaction" },
-      "description": "Stores user reactions to a shared memory. The userId must match the authenticated user's UID."
+      "description": "Stores shared memories. Any authenticated user can read and write."
     },
     "/memories/{memoryId}/chat_messages/{messageId}": {
       "schema": { "$ref": "#/entities/ChatMessage" },
