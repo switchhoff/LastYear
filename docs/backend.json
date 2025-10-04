@@ -52,9 +52,12 @@
         },
         "chatMessages": {
           "type": "array",
-          "description": "An array of chat messages for the memory.",
+          "description": "An array of chat messages, where each message is a [userId, text] pair.",
           "items": {
-            "$ref": "#/entities/ChatMessage"
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -75,31 +78,6 @@
         }
       },
       "required": ["userId", "reaction"]
-    },
-    "ChatMessage": {
-      "title": "ChatMessage",
-      "type": "object",
-      "description": "Represents a single message within the journal/chat conversation.",
-      "properties": {
-        "userId": {
-          "type": "string",
-          "description": "The user who sent the message."
-        },
-        "userName": {
-          "type": "string",
-          "description": "The display name of the user who sent the message."
-        },
-        "text": {
-          "type": "string",
-          "description": "The content of the chat message."
-        },
-        "timestamp": {
-          "type": "string",
-          "format": "date-time",
-          "description": "The timestamp of when the message was sent."
-        }
-      },
-      "required": ["userId", "userName", "text", "timestamp"]
     }
   },
   "auth": {

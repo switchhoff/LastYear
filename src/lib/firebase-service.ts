@@ -5,7 +5,6 @@ import {
   getDoc,
   updateDoc,
   arrayUnion,
-  serverTimestamp,
   writeBatch,
   type Firestore,
 } from 'firebase/firestore';
@@ -14,13 +13,6 @@ import type { User } from 'firebase/auth';
 import type { DatedSentence } from './daily-content';
 
 const { firestore: db } = initializeFirebase();
-
-export type ChatMessage = {
-  userId: string;
-  userName: string;
-  text: string;
-  timestamp: any; // Allow Timestamp or ServerTimestamp
-};
 
 export type UserReaction = {
   userId: string;
@@ -33,7 +25,7 @@ export type Memory = {
     sentence: string;
     aiArtUrl: string;
     reactions: UserReaction[];
-    chatMessages?: ChatMessage[];
+    chatMessages?: string[][]; // [userId, messageText]
 }
 
 const getMemoryDocId = (date: Date): string => {
@@ -55,15 +47,24 @@ export async function saveReaction(
 
   try {
     const memorySnap = await getDoc(memoryRef);
-    
-    if (memorySnap.exists()) {
-      let reactions = memorySnap.data().reactions || [];
-      reactions = reactions.filter((r: UserReaction) => r.userId !== user.uid);
-      if (reaction) {
-        reactions.push({ userId: user.uid, reaction });
-      }
-      await updateDoc(memoryRef, { reactions });
+    if (!memorySnap.exists()) {
+       // This case should ideally not be hit if ensureMemoryDocuments runs correctly.
+      console.error("Attempted to react to a memory document that doesn't exist:", memoryId);
+      return;
     }
+    
+    let reactions: UserReaction[] = memorySnap.data().reactions || [];
+    
+    // Remove previous reaction from the user
+    reactions = reactions.filter((r: UserReaction) => r.userId !== user.uid);
+    
+    // Add new reaction if one was provided
+    if (reaction) {
+      reactions.push({ userId: user.uid, reaction });
+    }
+
+    await updateDoc(memoryRef, { reactions });
+
   } catch (error) {
      const contextualError = new FirestorePermissionError({
       operation: 'update',
@@ -78,31 +79,26 @@ export async function addChatMessage(
   memoryDate: Date,
   text: string
 ) {
-  if (!user) return;
+  if (!user || !text.trim()) return;
 
   const memoryId = getMemoryDocId(memoryDate);
   const memoryRef = doc(db, 'memories', memoryId);
 
   try {
-    const userRef = doc(db, 'users', user.uid);
-    const userSnap = await getDoc(userRef);
-    const userName = userSnap.exists() ? userSnap.data().userName : (user.displayName || user.email?.split('@')[0] || 'Anonymous');
-
-    const newMessage: ChatMessage = {
-      userId: user.uid,
-      userName: userName,
-      text,
-      timestamp: serverTimestamp(),
-    };
-
+    const newMessage = [user.uid, text];
+    
+    // Atomically add the new message to the "chatMessages" array field.
+    // This is an update operation. It will fail if the document does not exist.
     await updateDoc(memoryRef, {
       chatMessages: arrayUnion(newMessage)
     });
     
   } catch (error) {
+    console.error("Error adding chat message:", error);
     const contextualError = new FirestorePermissionError({
-      operation: 'update',
+      operation: 'update', // This is an update operation.
       path: memoryRef.path,
+      requestResourceData: { chatMessages: `arrayUnion(['${user.uid}', '${text}'])`}
     });
     errorEmitter.emit('permission-error', contextualError);
   }
@@ -167,7 +163,7 @@ export async function ensureMemoryDocuments(firestore: Firestore, allSentences: 
                     id: memoryId,
                     date: sentence.date.toISOString().split('T')[0],
                     sentence: sentence.sentence,
-                    aiArtUrl: "https://picsum.photos/seed/placeholder/600/400", // Default placeholder
+                    aiArtUrl: `https://picsum.photos/seed/${memoryId}/600/400`,
                     reactions: [],
                     chatMessages: [],
                 };

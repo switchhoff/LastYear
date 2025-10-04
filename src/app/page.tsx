@@ -36,7 +36,6 @@ import {
   getAllMemoryReactions,
   getMemoryDocRef,
   ensureMemoryDocuments,
-  type ChatMessage,
   type UserReaction,
   type Memory,
 } from '@/lib/firebase-service';
@@ -114,7 +113,6 @@ function FeedbackSection({ content }: { content: DailyContent }) {
   const { data: memoryData } = useDoc<Memory>(memoryDocRef);
   
   const reactions = useMemo(() => memoryData?.reactions || [], [memoryData]);
-
   const userReaction = useMemo(() => {
     return reactions.find((r) => r.userId === user?.uid)?.reaction || null;
   }, [reactions, user?.uid]);
@@ -194,20 +192,24 @@ function ChatSection({ content, memoryData }: { content: DailyContent, memoryDat
     <div className="flex flex-col h-[400px] bg-muted/50 rounded-lg p-4">
       <ScrollArea className="flex-grow mb-4 pr-4" ref={scrollAreaRef}>
         <div className="flex flex-col gap-4">
-          {messages?.map((msg, index) => (
-            <div
-              key={index}
-              className={cn(
-                'flex flex-col max-w-[75%] p-2 px-3 rounded-lg',
-                msg.userId === user?.uid
-                  ? 'bg-primary text-primary-foreground self-end items-end'
-                  : 'bg-background self-start items-start'
-              )}
-            >
-              <span className="text-xs text-muted-foreground">{msg.userName}</span>
-              <p>{msg.text}</p>
-            </div>
-          ))}
+          {messages?.map((msg, index) => {
+            const msgUserId = msg[0];
+            const msgText = msg[1];
+            return (
+              <div
+                key={index}
+                className={cn(
+                  'flex flex-col max-w-[75%] p-2 px-3 rounded-lg',
+                  msgUserId === user?.uid
+                    ? 'bg-primary text-primary-foreground self-end items-end'
+                    : 'bg-background self-start items-start'
+                )}
+              >
+                <span className="text-xs text-muted-foreground">{msgUserId === user?.uid ? 'You' : 'Them'}</span>
+                <p>{msgText}</p>
+              </div>
+            );
+          })}
         </div>
       </ScrollArea>
       <div className="flex items-center gap-2">
@@ -250,7 +252,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     async function setupData() {
         if (!user || !firestore) return;
 
-        // 1. Ensure all memory documents exist in Firestore.
+        // 1. Ensure all memory documents exist in Firestore. This is the crucial step.
         await ensureMemoryDocuments(firestore, allSentences);
 
         // 2. Fetch historical reactions for the UI.
@@ -271,7 +273,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
         setHistoricalSentences(sentencesWithReactions);
         setDataReady(true); // Mark data as ready
     }
-    if (user) {
+    if (user && firestore) {
       setupData();
     }
   }, [allSentences, user, firestore]);
@@ -281,7 +283,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-background text-foreground">
         <LoadingSpinner className="h-12 w-12 text-primary" />
-        <p className="text-muted-foreground mt-4">Loading user data...</p>
+        <p className="text-muted-foreground mt-4">Loading user data and memories...</p>
       </main>
     );
   }
