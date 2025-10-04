@@ -52,12 +52,9 @@
         },
         "chatMessages": {
           "type": "array",
-          "description": "An array of chat messages, where each message is a [userId, text] pair.",
+          "description": "An array of chat messages associated with the memory.",
           "items": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "$ref": "#/entities/UserMemoryChatMessage"
           }
         }
       },
@@ -78,6 +75,26 @@
         }
       },
       "required": ["userId", "reaction"]
+    },
+    "UserMemoryChatMessage": {
+      "title": "UserMemoryChatMessage",
+      "type": "object",
+      "description": "Represents a user's chat message on a specific memory.",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The user ID who sent the message."
+        },
+        "text": {
+          "type": "string",
+          "description": "The content of the chat message."
+        },
+        "userName": {
+          "type": "string",
+          "description": "The name of the user who sent the message."
+        }
+      },
+      "required": ["userId", "text", "userName"]
     }
   },
   "auth": {

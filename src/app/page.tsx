@@ -38,6 +38,7 @@ import {
   ensureMemoryDocuments,
   type UserReaction,
   type Memory,
+  type UserMemoryChatMessage,
 } from '@/lib/firebase-service';
 import { useUser, useAuth, useMemoFirebase, useDoc, useFirestore } from '@/firebase';
 
@@ -192,21 +193,19 @@ function ChatSection({ content, memoryData }: { content: DailyContent, memoryDat
     <div className="flex flex-col h-[400px] bg-muted/50 rounded-lg p-4">
       <ScrollArea className="flex-grow mb-4 pr-4" ref={scrollAreaRef}>
         <div className="flex flex-col gap-4">
-          {messages?.map((msg, index) => {
-            const msgUserId = msg[0];
-            const msgText = msg[1];
+          {messages?.map((msg: UserMemoryChatMessage, index) => {
             return (
               <div
                 key={index}
                 className={cn(
                   'flex flex-col max-w-[75%] p-2 px-3 rounded-lg',
-                  msgUserId === user?.uid
+                  msg.userId === user?.uid
                     ? 'bg-primary text-primary-foreground self-end items-end'
                     : 'bg-background self-start items-start'
                 )}
               >
-                <span className="text-xs text-muted-foreground">{msgUserId === user?.uid ? 'You' : 'Them'}</span>
-                <p>{msgText}</p>
+                <span className="text-xs text-muted-foreground">{msg.userName}</span>
+                <p>{msg.text}</p>
               </div>
             );
           })}
@@ -252,10 +251,8 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     async function setupData() {
         if (!user || !firestore) return;
 
-        // 1. Ensure all memory documents exist in Firestore. This is the crucial step.
         await ensureMemoryDocuments(firestore, allSentences);
 
-        // 2. Fetch historical reactions for the UI.
         const today = new Date();
         const oneYearAgo = new Date(Date.UTC(today.getUTCFullYear() - 1, today.getUTCMonth(), today.getUTCDate()));
         
@@ -271,7 +268,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
             })
         );
         setHistoricalSentences(sentencesWithReactions);
-        setDataReady(true); // Mark data as ready
+        setDataReady(true);
     }
     if (user && firestore) {
       setupData();

@@ -19,13 +19,19 @@ export type UserReaction = {
   reaction: string;
 };
 
+export type UserMemoryChatMessage = {
+  userId: string;
+  userName: string;
+  text: string;
+};
+
 export type Memory = {
     id: string;
     date: string;
     sentence: string;
     aiArtUrl: string;
     reactions: UserReaction[];
-    chatMessages?: string[][]; // [userId, messageText]
+    chatMessages?: UserMemoryChatMessage[];
 }
 
 const getMemoryDocId = (date: Date): string => {
@@ -48,7 +54,7 @@ export async function saveReaction(
   try {
     const memorySnap = await getDoc(memoryRef);
     if (!memorySnap.exists()) {
-       // This case should ideally not be hit if ensureMemoryDocuments runs correctly.
+      // This case should not be hit if ensureMemoryDocuments runs correctly.
       console.error("Attempted to react to a memory document that doesn't exist:", memoryId);
       return;
     }
@@ -85,10 +91,17 @@ export async function addChatMessage(
   const memoryRef = doc(db, 'memories', memoryId);
 
   try {
-    const newMessage = [user.uid, text];
+    const userDocRef = doc(db, 'users', user.uid);
+    const userDocSnap = await getDoc(userDocRef);
+    const userName = userDocSnap.exists() ? userDocSnap.data().userName : 'Anonymous';
+
+    const newMessage: UserMemoryChatMessage = {
+      userId: user.uid,
+      userName: userName,
+      text: text,
+    };
     
     // Atomically add the new message to the "chatMessages" array field.
-    // This is an update operation. It will fail if the document does not exist.
     await updateDoc(memoryRef, {
       chatMessages: arrayUnion(newMessage)
     });
@@ -96,9 +109,9 @@ export async function addChatMessage(
   } catch (error) {
     console.error("Error adding chat message:", error);
     const contextualError = new FirestorePermissionError({
-      operation: 'update', // This is an update operation.
+      operation: 'update',
       path: memoryRef.path,
-      requestResourceData: { chatMessages: `arrayUnion(['${user.uid}', '${text}'])`}
+      requestResourceData: { chatMessages: `arrayUnion({ userId: ${user.uid}, text: ${text} })`}
     });
     errorEmitter.emit('permission-error', contextualError);
   }
@@ -141,8 +154,6 @@ export async function ensureMemoryDocuments(firestore: Firestore, allSentences: 
     try {
         const batch = writeBatch(firestore);
         
-        // We can't perform a get() in a batch, so we fetch all existing documents first.
-        // For larger apps, this could be optimized, but for a year's worth of data it's fine.
         const existingDocsPromises = allSentences.map(sentence => {
             const memoryId = getMemoryDocId(sentence.date);
             const memoryRef = doc(firestore, 'memories', memoryId);
@@ -155,7 +166,6 @@ export async function ensureMemoryDocuments(firestore: Firestore, allSentences: 
             const sentence = allSentences[i];
             const docSnapshot = existingDocsSnapshots[i];
 
-            // If the document does not exist, add it to the batch to be created.
             if (!docSnapshot.exists()) {
                 const memoryId = getMemoryDocId(sentence.date);
                 const memoryRef = doc(firestore, 'memories', memoryId);
@@ -171,11 +181,8 @@ export async function ensureMemoryDocuments(firestore: Firestore, allSentences: 
             }
         }
         
-        // Commit the batch to create all missing documents at once.
         await batch.commit();
     } catch (error) {
         console.error("Error ensuring memory documents:", error);
-         // This is a background task, so we'll just log the error.
-         // A specific error could be emitted here if needed.
     }
 }
