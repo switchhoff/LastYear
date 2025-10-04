@@ -51,27 +51,35 @@ const getMemoryDocId = (date: Date): string => {
 };
 
 // Helper to ensure the parent memory document exists before writing a subcollection.
-const ensureMemoryDocExists = async (userId: string, memoryDate: Date) => {
+const ensureMemoryDocExists = (userId: string, memoryDate: Date, sentence: string) => {
     if (!userId) return;
     const memoryId = getMemoryDocId(memoryDate);
     const memoryRef = doc(db, 'users', userId, 'memories', memoryId);
     
+    // Create the full Memory object to satisfy schema requirements
+    const memoryData = {
+        date: memoryDate.toISOString().split('T')[0], // YYYY-MM-DD format
+        sentence: sentence,
+        aiArtUrl: "https://picsum.photos/seed/placeholder/600/400", // Placeholder URL
+        createdAt: serverTimestamp(),
+    };
+
     // Use a non-blocking set with merge to create the doc if it doesn't exist,
-    // or do nothing if it does. This avoids a read operation.
-    // We add a `createdAt` timestamp to have some data in the document.
-    setDocumentNonBlocking(memoryRef, { createdAt: serverTimestamp() }, { merge: true });
+    // or update it with the required fields.
+    setDocumentNonBlocking(memoryRef, memoryData, { merge: true });
 };
 
 
 export function saveReaction(
   userId: string,
   memoryDate: Date,
+  sentence: string,
   reaction: string | null
 ) {
   if (!userId) return;
 
   // Ensure the parent memory document exists before saving a reaction.
-  ensureMemoryDocExists(userId, memoryDate);
+  ensureMemoryDocExists(userId, memoryDate, sentence);
 
   const memoryId = getMemoryDocId(memoryDate);
   const reactionRef = doc(db, 'users', userId, 'memories', memoryId, 'reactions', userId);
@@ -82,12 +90,13 @@ export function addChatMessage(
   userId:string,
   userEmail: string,
   memoryDate: Date,
+  sentence: string,
   text: string
 ) {
   if (!userId) return;
 
   // Ensure the parent memory document exists before adding a chat message.
-  ensureMemoryDocExists(userId, memoryDate);
+  ensureMemoryDocExists(userId, memoryDate, sentence);
 
   const memoryId = getMemoryDocId(memoryDate);
   const chatCollectionRef = collection(
