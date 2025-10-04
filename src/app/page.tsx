@@ -18,6 +18,7 @@ import {
   PlusCircle,
   Pencil,
   Save,
+  Calendar as CalendarIcon,
 } from 'lucide-react';
 import {
   Dialog,
@@ -46,6 +47,9 @@ import {
 } from '@/lib/firebase-service';
 import { useUser, useAuth, useMemoFirebase, useDoc, useFirestore, useCollection } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
+import { Calendar } from '@/components/ui/calendar';
+import { addDays, format } from "date-fns"
+
 
 type DailyContent = {
   displayDate: Date;
@@ -246,7 +250,6 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
 
     memoriesMap.forEach((memory, id) => {
         const dateParts = id.split('-').map(Number);
-        // Create date in local time from Y-M-D
         const memoryDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
         memoryDate.setHours(0,0,0,0);
         
@@ -255,7 +258,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
         displayDate.setHours(0,0,0,0);
 
         if (displayDate <= today) {
-            const sentence = Object.values(memory.userSentences || {})[0] || (memory as any).sentence || "No sentence found.";
+             const sentence = (memory.userSentences && Object.values(memory.userSentences)[0]) || (memory as any).sentence || "No sentence found.";
             
             combinedEntries.push({
                 date: memoryDate,
@@ -316,7 +319,9 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   const [content, setContent] = useState<DailyContent | null>(null);
   const [loading, setLoading] = useState(true);
   const [showContent, setShowContent] = useState(false);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
+  const [isAddMemoryDialogOpen, setIsAddMemoryDialogOpen] = useState(false);
+  const [selectedDateForEditing, setSelectedDateForEditing] = useState<Date | undefined>(undefined);
   const [spoilerAlert, setSpoilerAlert] = useState(true);
   const [isViewingHistorical, setIsViewingHistorical] = useState(false);
   const [showFeedback, setShowFeedback] = useState(true);
@@ -340,23 +345,29 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
 
   const { data: memoryData } = useDoc<Memory>(memoryDocRef);
   
-  const todayDocId = useMemo(() => getMemoryDocId(new Date()), []);
-  const todayMemoryDocRef = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return doc(firestore, 'memories', todayDocId);
-  }, [firestore, todayDocId]);
-  const { data: todayMemory } = useDoc<Memory>(todayMemoryDocRef);
+  const editingMemoryDocId = useMemo(() => {
+    if (!selectedDateForEditing) return null;
+    return getMemoryDocId(selectedDateForEditing);
+  }, [selectedDateForEditing]);
 
-  const userSentenceFromToday = useMemo(() => {
-    if (!todayMemory || !user) return '';
-    return todayMemory.userSentences?.[user.uid] || '';
-  }, [todayMemory, user]);
+  const editingMemoryDocRef = useMemoFirebase(() => {
+    if (!firestore || !editingMemoryDocId) return null;
+    return doc(firestore, 'memories', editingMemoryDocId);
+  }, [firestore, editingMemoryDocId]);
+
+  const { data: editingMemory } = useDoc<Memory>(editingMemoryDocRef);
+  
+  const userSentenceForEditingDate = useMemo(() => {
+    if (!editingMemory || !user) return '';
+    return editingMemory.userSentences?.[user.uid] || '';
+  }, [editingMemory, user]);
 
   useEffect(() => {
-    if (mode === 'add') {
-      setNewUserSentence(userSentenceFromToday);
+    if (mode === 'add' && selectedDateForEditing) {
+      setNewUserSentence(userSentenceForEditingDate);
     }
-  }, [mode, userSentenceFromToday]);
+  }, [mode, userSentenceForEditingDate, selectedDateForEditing]);
+
 
   const reactions = useMemo(() => memoryData?.reactions || [], [memoryData]);
   const userReaction = useMemo(() => {
@@ -490,7 +501,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   }, [loading, content]);
 
   const handleHistoricalSelect = (memoryDate: Date) => {
-    setIsDialogOpen(false);
+    setIsHistoryDialogOpen(false);
     setMode('view');
     const displayDate = new Date(memoryDate);
     displayDate.setFullYear(memoryDate.getFullYear() + 1);
@@ -507,36 +518,60 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   };
 
   const handleSaveSentence = async () => {
-    if (!user || !firestore || !newUserSentence.trim()) return;
+    if (!user || !firestore || !newUserSentence.trim() || !selectedDateForEditing) return;
     setIsSending(true);
-    await saveUserSentence(firestore, user, new Date(), newUserSentence);
+    await saveUserSentence(firestore, user, selectedDateForEditing, newUserSentence);
     setIsSending(false);
     setMode('view');
     toast({ title: "Memory saved!" });
+    setSelectedDateForEditing(undefined);
   };
+
+  const handleDateSelectForEditing = (date: Date | undefined) => {
+    if (date) {
+        setSelectedDateForEditing(date);
+        setIsAddMemoryDialogOpen(false);
+        setMode('add');
+    }
+  }
   
+  const handleExitAddMode = () => {
+    setMode('view');
+    setSelectedDateForEditing(undefined);
+    setNewUserSentence('');
+  }
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-background text-foreground">
        <div className="absolute top-6 left-6 flex items-center gap-2">
-        {content?.isToday && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-12 w-12"
-            onClick={() => {
-              if (mode === 'add') {
-                setMode('view');
-              } else {
-                setMode('add');
-                setNewUserSentence(userSentenceFromToday);
-              }
-            }}
-          >
-            {mode === 'add' ? <Eye className="h-8 w-8" /> : <Pencil className="h-7 w-7" />}
-            <span className="sr-only">{mode === 'add' ? 'View Memory' : 'Add Memory'}</span>
-          </Button>
-        )}
+         {mode === 'add' ? (
+           <Button variant="ghost" size="icon" className="h-12 w-12" onClick={handleExitAddMode}>
+             <Eye className="h-8 w-8" />
+             <span className="sr-only">View Memory</span>
+           </Button>
+         ) : (
+          <Dialog open={isAddMemoryDialogOpen} onOpenChange={setIsAddMemoryDialogOpen}>
+            <DialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-12 w-12" >
+                    <Pencil className="h-7 w-7" />
+                    <span className="sr-only">Add Memory</span>
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Add or Edit a Memory</DialogTitle>
+                </DialogHeader>
+                <p className="text-muted-foreground text-sm">Select a date to write your memory for that day. You can go back as far as September 23, 2024.</p>
+                <Calendar
+                    mode="single"
+                    selected={selectedDateForEditing}
+                    onSelect={handleDateSelectForEditing}
+                    disabled={{ before: new Date('2024-09-23'), after: new Date() }}
+                    initialFocus
+                />
+            </DialogContent>
+          </Dialog>
+         )}
       </div>
 
       <div className="absolute top-6 right-6 flex items-center gap-2">
@@ -554,7 +589,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
             {showFeedback ? 'Hide feedback section' : 'Show feedback section'}
           </span>
         </Button>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isHistoryDialogOpen} onOpenChange={setIsHistoryDialogOpen}>
           <DialogTrigger asChild>
             <Button
               variant="ghost"
@@ -707,14 +742,14 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
 
             {showFeedback && memoryData && <ChatSection content={content} memoryData={memoryData} />}
           </div>
-        ) : content && mode === 'add' ? (
+        ) : content && mode === 'add' && selectedDateForEditing ? (
            <div className={cn(
               'flex flex-col items-center justify-center opacity-0 w-full max-w-2xl',
               showContent && 'animate-fade-in'
             )}>
               <div className="flex flex-col gap-2 mb-8 w-full">
                 <p className="text-lg text-foreground/80 text-center">
-                  {new Date().toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+                  {selectedDateForEditing.toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' })}
                 </p>
                 <h1 className="text-2xl font-bold text-foreground tracking-wider text-center">
                   What's on your mind today?
@@ -723,7 +758,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
               <Textarea
                 value={newUserSentence}
                 onChange={(e) => setNewUserSentence(e.target.value)}
-                placeholder="Write your memory for today..."
+                placeholder="Write your memory for this day..."
                 className="w-full min-h-[200px] text-lg p-4"
               />
               <Button onClick={handleSaveSentence} disabled={isSending || !newUserSentence.trim()} className="mt-4">
