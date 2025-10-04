@@ -50,24 +50,22 @@ export async function saveUserSentence(
   const memoryId = getMemoryDocId(date);
   const memoryRef = doc(firestore, 'memories', memoryId);
 
-  // Use dot notation to update a specific field in the map
-  const fieldPath = `userSentences.${user.uid}`;
-  const dataToUpdate = { [fieldPath]: sentence };
+  const dataToUpdate = { 
+    id: memoryId,
+    date: date.toISOString().split('T')[0],
+    userSentences: { [user.uid]: sentence }
+  };
   
   try {
      // Use setDoc with merge to create the doc if it doesn't exist, 
-     // or update it if it does. This handles both creation and update.
-    await setDoc(memoryRef, { 
-      id: memoryId,
-      date: date.toISOString().split('T')[0],
-      userSentences: { [user.uid]: sentence }
-    }, { merge: true });
+     // or update the user's sentence if it does.
+    await setDoc(memoryRef, dataToUpdate, { merge: true });
 
   } catch (error) {
      const contextualError = new FirestorePermissionError({
       operation: 'write',
       path: memoryRef.path,
-      requestResourceData: dataToUpdate
+      requestResourceData: { [`userSentences.${user.uid}`]: sentence }
     });
     errorEmitter.emit('permission-error', contextualError);
   }
@@ -184,3 +182,5 @@ export async function ensureMemoryDocuments(firestore: Firestore, allSentences: 
 
 // Hardcoded user IDs for legacy data.
 const ALEX_USER_ID = '1xcBSDAluySuyeLwX5TEQnuiPMA2';
+
+    

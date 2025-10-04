@@ -338,15 +338,6 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
 
   const { data: memoryData } = useDoc<Memory>(memoryDocRef);
   
-  const userSentenceForToday = useMemo(() => {
-    if (!memoryData || !user) return '';
-    // This needs to check against the *current date* memory, not the historical one.
-    // This will be handled by fetching today's memory data separately when in 'add' mode.
-    return memoryData.userSentences?.[user.uid] || '';
-  }, [memoryData, user]);
-  
-  // New state to hold today's memory for the 'add' mode
-  const [todayMemoryData, setTodayMemoryData] = useState<Memory | null>(null);
   const todayDocId = useMemo(() => getMemoryDocId(new Date()), []);
   const todayMemoryDocRef = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -354,16 +345,10 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   }, [firestore, todayDocId]);
   const { data: todayMemory } = useDoc<Memory>(todayMemoryDocRef);
 
-  useEffect(() => {
-    if (todayMemory) {
-      setTodayMemoryData(todayMemory);
-    }
-  }, [todayMemory]);
-
   const userSentenceFromToday = useMemo(() => {
-    if (!todayMemoryData || !user) return '';
-    return todayMemoryData.userSentences?.[user.uid] || '';
-  }, [todayMemoryData, user]);
+    if (!todayMemory || !user) return '';
+    return todayMemory.userSentences?.[user.uid] || '';
+  }, [todayMemory, user]);
 
   useEffect(() => {
     if (mode === 'add') {
@@ -434,13 +419,15 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     generateEmojis(userReaction, true);
   }
 
-  const fetchContent = useCallback(async (displayDate: Date) => {
+  const fetchContent = useCallback(async (targetDisplayDate: Date) => {
     try {
       setLoading(true);
       setShowContent(false);
       setContent(null);
 
+      const displayDate = new Date(Date.UTC(targetDisplayDate.getUTCFullYear(), targetDisplayDate.getUTCMonth(), targetDisplayDate.getUTCDate()));
       const memoryDate = new Date(Date.UTC(displayDate.getUTCFullYear() - 1, displayDate.getUTCMonth(), displayDate.getUTCDate()));
+      
       const today = new Date();
       const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
       const isToday = displayDate.getTime() === todayUTC.getTime();
@@ -476,9 +463,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   }, [toast]);
 
   const fetchTodaysContent = useCallback(() => {
-    const today = new Date();
-    const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
-    fetchContent(todayUTC);
+    fetchContent(new Date());
     setIsViewingHistorical(false);
     setMode('view');
   },[fetchContent]);
