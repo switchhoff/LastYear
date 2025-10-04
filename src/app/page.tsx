@@ -14,6 +14,7 @@ import {
   EyeOff,
   Send,
   LogOut,
+  MessageSquare,
 } from 'lucide-react';
 import {
   Dialog,
@@ -50,7 +51,7 @@ type DailyContent = {
   memorableDate: MemorableDate | undefined;
 };
 
-type HistoricalEntryWithReactions = DatedSentence & { reactions: UserReaction[] };
+type HistoricalEntryWithReactions = DatedSentence & { reactions: UserReaction[]; chatMessages: UserMemoryChatMessage[] };
 
 const ALEX_USER_ID = '1xcBSDAluySuyeLwX5TEQnuiPMA2';
 const AMALIE_USER_ID = 'SFsKmCQM9NZi7Drmsb4pNBtLJ6m1';
@@ -66,10 +67,11 @@ function HistoricalEntry({
 }) {
   const alexReaction = useMemo(() => entry.reactions.find(r => r.userId === ALEX_USER_ID)?.reaction, [entry.reactions]);
   const amalieReaction = useMemo(() => entry.reactions.find(r => r.userId === AMALIE_USER_ID)?.reaction, [entry.reactions]);
+  const chatCount = entry.chatMessages?.length || 0;
 
   return (
     <div
-      className="grid grid-cols-3 items-center gap-4 p-2 rounded-md hover:bg-muted cursor-pointer"
+      className="grid grid-cols-4 items-center gap-4 p-2 rounded-md hover:bg-muted cursor-pointer"
       onClick={() => onSelect(entry.date)}
     >
       <div className="flex-grow col-span-1">
@@ -99,6 +101,16 @@ function HistoricalEntry({
       </div>
       <div className="text-center text-2xl col-span-1">
         {amalieReaction || <span className="text-muted-foreground/50">-</span>}
+      </div>
+       <div className="col-span-1 flex justify-center">
+        {chatCount > 0 && (
+          <div className="relative">
+            <MessageSquare className="h-6 w-6 text-muted-foreground" />
+            <Badge variant="destructive" className="absolute -top-2 -right-3 px-1.5 h-5 min-w-[20px] flex items-center justify-center">
+              {chatCount > 9 ? '9+' : chatCount}
+            </Badge>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -197,7 +209,7 @@ function ChatSection({ content, memoryData }: { content: DailyContent, memoryDat
     <div className="flex flex-col h-[400px] bg-muted/50 rounded-lg p-4">
       <ScrollArea className="flex-grow mb-4 pr-4" ref={scrollAreaRef}>
         <div className="flex flex-col gap-4">
-          {messages?.map((msg: UserMemoryChatMessage, index) => {
+          {messages?.map((msg, index) => {
             const isCurrentUser = msg.userId === user?.uid;
             const isAlex = msg.userId === ALEX_USER_ID;
             const isAmalie = msg.userId === AMALIE_USER_ID;
@@ -278,7 +290,8 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
         const memory = memoriesMap.get(memoryId);
         return {
           ...entry,
-          reactions: memory?.reactions || []
+          reactions: memory?.reactions || [],
+          chatMessages: memory?.chatMessages || []
         };
       });
 
@@ -465,10 +478,11 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
             </div>
             <div className="relative flex-grow">
               <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm">
-                <div className="grid grid-cols-3 items-center gap-4 p-2 font-semibold text-muted-foreground border-b">
+                <div className="grid grid-cols-4 items-center gap-4 p-2 font-semibold text-muted-foreground border-b">
                   <div className="col-span-1">Date</div>
                   <div className="text-center col-span-1">Alex</div>
                   <div className="text-center col-span-1">Amalie</div>
+                  <div className="col-span-1"></div>
                 </div>
               </div>
               <ScrollArea className="h-[calc(100vh-200px)]">
@@ -567,5 +581,3 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     </main>
   );
 }
-
-    
