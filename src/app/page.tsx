@@ -15,6 +15,7 @@ import {
   Send,
   LogOut,
   MessageSquare,
+  RefreshCcw,
 } from 'lucide-react';
 import {
   Dialog,
@@ -140,18 +141,22 @@ function FeedbackSection({ content }: { content: DailyContent }) {
 
   const [displayedEmojis, setDisplayedEmojis] = useState<string[]>([]);
 
-  useEffect(() => {
+  const generateEmojis = useCallback((currentReaction: string | null) => {
     const shuffled = [...positiveEmojis].sort(() => 0.5 - Math.random());
-    const initialEmojis = shuffled.slice(0, 5);
-    
-    if (userReaction && !initialEmojis.includes(userReaction)) {
-        initialEmojis[Math.floor(Math.random() * initialEmojis.length)] = userReaction;
+    const newEmojis = shuffled.slice(0, 5);
+
+    if (currentReaction && !newEmojis.includes(currentReaction)) {
+      newEmojis[Math.floor(Math.random() * newEmojis.length)] = currentReaction;
     }
-    setDisplayedEmojis(initialEmojis);
+    setDisplayedEmojis(newEmojis);
+  }, []);
+
+  useEffect(() => {
+    generateEmojis(userReaction);
   // We only want to run this effect once when the content changes to set the initial emojis.
   // userReaction is intentionally left out of dependencies to prevent re-shuffling on reaction change.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [content]);
+  }, [content, generateEmojis]);
 
 
   const handleReact = async (emoji: string) => {
@@ -161,6 +166,10 @@ function FeedbackSection({ content }: { content: DailyContent }) {
     await saveReaction(firestore, user, content.yearAgoDate, newEmoji);
     setIsSending(false);
   };
+  
+  const handleRefreshEmojis = () => {
+    generateEmojis(userReaction);
+  }
 
   return (
     <div className="w-full max-w-2xl mt-12 animate-fade-in">
@@ -183,6 +192,15 @@ function FeedbackSection({ content }: { content: DailyContent }) {
                 {emoji}
               </Button>
             ))}
+             <Button
+              variant="ghost"
+              size="icon"
+              className="h-14 w-14 rounded-full"
+              onClick={handleRefreshEmojis}
+              disabled={isSending || !user}
+            >
+              <RefreshCcw className="h-6 w-6 text-muted-foreground" />
+            </Button>
           </div>
         </TabsContent>
         <TabsContent value="journal">
