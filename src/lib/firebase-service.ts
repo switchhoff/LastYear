@@ -54,38 +54,30 @@ export async function saveReaction(
 
   try {
     const memorySnap = await getDoc(memoryRef);
+    let reactions = memorySnap.exists() ? memorySnap.data().reactions || [] : [];
+
+    // Remove existing reaction from the user
+    reactions = reactions.filter((r: UserReaction) => r.userId !== user.uid);
+
+    // Add new reaction if one was provided
+    if (reaction) {
+      reactions.push({ userId: user.uid, reaction });
+    }
 
     if (memorySnap.exists()) {
-      // Document exists, update the reactions array.
-      const currentReactions = memorySnap.data().reactions || [];
-      const existingReaction = currentReactions.find((r: UserReaction) => r.userId === user.uid);
-
-      if (existingReaction) {
-        // User is changing or removing their reaction
-        await updateDoc(memoryRef, {
-          reactions: arrayRemove(existingReaction)
-        });
-      }
-      
-      if (reaction) {
-        // Add new reaction
-        await updateDoc(memoryRef, {
-          reactions: arrayUnion({ userId: user.uid, reaction })
-        });
-      }
+      // Update existing document
+      await updateDoc(memoryRef, { reactions });
     } else {
-      // Document doesn't exist, create it, but only if they are adding a reaction
-      if (reaction) {
-        const newMemory: Memory = {
-          id: memoryId,
-          date: memoryDate.toISOString().split('T')[0],
-          sentence: sentence,
-          aiArtUrl: "https://picsum.photos/seed/placeholder/600/400",
-          reactions: [{ userId: user.uid, reaction }],
-          chatMessages: [],
-        };
-        await setDoc(memoryRef, newMemory);
-      }
+      // Create new document if it doesn't exist
+      const newMemory: Memory = {
+        id: memoryId,
+        date: memoryDate.toISOString().split('T')[0],
+        sentence: sentence,
+        aiArtUrl: "https://picsum.photos/seed/placeholder/600/400",
+        reactions: reactions,
+        chatMessages: [],
+      };
+      await setDoc(memoryRef, newMemory);
     }
   } catch (error) {
      const contextualError = new FirestorePermissionError({
