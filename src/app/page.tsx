@@ -79,7 +79,7 @@ function HistoricalEntry({
   const chatCount = entry.chatMessages?.length || 0;
 
   const displayDate = new Date(entry.date);
-  displayDate.setUTCFullYear(displayDate.getUTCFullYear() + 1);
+  displayDate.setFullYear(displayDate.getFullYear() + 1);
 
   return (
     <div
@@ -93,7 +93,6 @@ function HistoricalEntry({
                 year: 'numeric',
                 month: '2-digit',
                 day: '2-digit',
-                timeZone: 'UTC',
             })}
             </span>
         </div>
@@ -243,16 +242,17 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     const combinedEntries: HistoricalEntryWithReactions[] = [];
 
     const today = new Date();
-    const todayUTC = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    today.setHours(0, 0, 0, 0);
 
     memoriesMap.forEach((memory, id) => {
         const dateParts = id.split('-').map(Number);
-        const memoryDate = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2]));
+        const memoryDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+        memoryDate.setHours(0,0,0,0);
         
         const displayDate = new Date(memoryDate);
-        displayDate.setUTCFullYear(displayDate.getUTCFullYear() + 1);
+        displayDate.setFullYear(displayDate.getFullYear() + 1);
 
-        if (displayDate <= todayUTC) {
+        if (displayDate <= today) {
             const sentence = Object.values(memory.userSentences || {})[0] || (memory as any).sentence || "No sentence found.";
             
             combinedEntries.push({
@@ -369,6 +369,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     if (memoryData.userSentences && Object.keys(memoryData.userSentences).length > 0) {
       return Object.values(memoryData.userSentences)[0];
     }
+    // Fallback for legacy data structure
     if ((memoryData as any).sentence) {
       return (memoryData as any).sentence;
     }
@@ -428,20 +429,24 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
       setLoading(true);
       setShowContent(false);
       setContent(null);
-      
-      const displayDate = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate()));
+
+      // Use local time, setting hours to 0 to avoid timezone shifts
+      const localTargetDate = new Date(targetDate);
+      localTargetDate.setHours(0, 0, 0, 0);
+
+      const displayDate = localTargetDate;
       const memoryDate = new Date(displayDate);
-      memoryDate.setUTCFullYear(displayDate.getUTCFullYear() + 1);
+      memoryDate.setFullYear(displayDate.getFullYear() - 1);
       
       const today = new Date();
-      const todayUTC = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
-      const isToday = displayDate.getTime() === todayUTC.getTime();
+      today.setHours(0, 0, 0, 0);
+      
+      const isToday = displayDate.getTime() === today.getTime();
 
       const dateString = displayDate.toLocaleDateString('en-GB', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
-        timeZone: 'UTC',
       });
       
       const memorableDate = getMemorableDate(displayDate);
@@ -488,7 +493,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     setIsDialogOpen(false);
     setMode('view');
     const displayDate = new Date(memoryDate);
-    displayDate.setUTCFullYear(memoryDate.getUTCFullYear() + 1);
+    displayDate.setFullYear(memoryDate.getFullYear() + 1);
     fetchContent(displayDate);
     setIsViewingHistorical(true);
   };
@@ -622,7 +627,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
           >
             <div className="flex flex-col gap-2 mb-24 items-center">
               {isViewingHistorical && (
-                <Button
+                 <Button
                   variant="ghost"
                   onClick={fetchTodaysContent}
                   className="mb-2"
@@ -709,7 +714,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
             )}>
               <div className="flex flex-col gap-2 mb-8 w-full">
                 <p className="text-lg text-foreground/80 text-center">
-                  {new Date().toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC' })}
+                  {new Date().toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' })}
                 </p>
                 <h1 className="text-2xl font-bold text-foreground tracking-wider text-center">
                   What's on your mind today?
@@ -753,5 +758,3 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     </main>
   );
 }
-
-    
