@@ -5,7 +5,6 @@ import {
   getDoc,
   updateDoc,
   arrayUnion,
-  arrayRemove,
   serverTimestamp,
 } from 'firebase/firestore';
 import { initializeFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
@@ -54,27 +53,26 @@ export async function saveReaction(
 
   try {
     const memorySnap = await getDoc(memoryRef);
-    let reactions = memorySnap.exists() ? memorySnap.data().reactions || [] : [];
-
-    // Remove existing reaction from the user
-    reactions = reactions.filter((r: UserReaction) => r.userId !== user.uid);
-
-    // Add new reaction if one was provided
-    if (reaction) {
-      reactions.push({ userId: user.uid, reaction });
-    }
-
+    
     if (memorySnap.exists()) {
-      // Update existing document
+      // Document exists, update the reactions array.
+      let reactions = memorySnap.data().reactions || [];
+      // Remove existing reaction from the user
+      reactions = reactions.filter((r: UserReaction) => r.userId !== user.uid);
+      // Add new reaction if one was provided
+      if (reaction) {
+        reactions.push({ userId: user.uid, reaction });
+      }
       await updateDoc(memoryRef, { reactions });
     } else {
-      // Create new document if it doesn't exist
+      // Document does not exist, create it.
+      const newReactions = reaction ? [{ userId: user.uid, reaction }] : [];
       const newMemory: Memory = {
         id: memoryId,
         date: memoryDate.toISOString().split('T')[0],
         sentence: sentence,
         aiArtUrl: "https://picsum.photos/seed/placeholder/600/400",
-        reactions: reactions,
+        reactions: newReactions,
         chatMessages: [],
       };
       await setDoc(memoryRef, newMemory);
