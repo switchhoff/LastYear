@@ -1,51 +1,71 @@
 /**
- * @fileoverview Firestore Security Rules for Prototyping.
- *
- * Core Philosophy:
- * This ruleset prioritizes rapid prototyping by granting broad access to all authenticated users.
- * It's designed to be permissive and allow any logged-in user to read and write any data.
+ * @file Firestore Security Rules
+ * @description This ruleset implements a user-centric security model with public read access to memories.
  *
  * Data Structure:
- * - Users are stored in `/users/{userId}`.
- * - Memories are stored in `/memories/{memoryId}`.
+ * - /users/{userId}: Stores user profiles, accessible only to the owning user.
+ * - /memories/{memoryId}: Stores memory entries, publicly readable and writable by any authenticated user.
  *
  * Key Security Decisions:
- * - Any authenticated user can access any data.
- * - No data shape validation is enforced for speed of iteration.
- * - This is a PROTOTYPE and is NOT suitable for production use.
+ * - Users can only manage their own profile data.
+ * - Memory data is publicly readable, but write access is restricted to authenticated users.
+ *
+ * Denormalization for Authorization:
+ *  - There is no denormalization needed as the memory documents are globally readable/writable
+ *  - The `userId` is available on the `/users/{userId}` document so it is possible to perform authorization
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows any authenticated user to manage user profiles.
+     * @description Controls access to user profile documents.
      * @path /users/{userId}
-     * @allow (create) User with matching userId can create their profile.
-     * @allow (get, list, update, delete) Any authenticated user can get, list, update, and delete user profiles.
-     * @deny (none) No restrictions are enforced beyond authentication.
-     * @principle Allows any authenticated user to access any user profile.
+     * @allow (create) - Allow user to create own profile if the userId matches the authenticated user's UID.
+     * @allow (get, update, delete) - Allow the user to read, update, or delete their own profile if the userId matches the authenticated user's UID.
+     * @deny (create) - Deny creating a user profile if the userId does not match the authenticated user's UID.
+     * @deny (get, update, delete) - Deny reading, updating, or deleting another user's profile.
+     * @principle Enforces user-ownership: only the authenticated user can manage their own profile.
      */
     match /users/{userId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      //Function to check if the user is signed in.
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      //Function to check if the user id matches the authenticated user id
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+      // Check if the user is an existing owner.
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource.data != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Allows any authenticated user to manage memories.
+     * @description Controls access to memory documents.  Any authenticated user can read.
      * @path /memories/{memoryId}
-     * @allow (create) Any authenticated user can create a memory.
-     * @allow (get, list, update, delete) Any authenticated user can get, list, update, and delete any memory.
-     * @deny (none) No restrictions are enforced beyond authentication.
-     * @principle Allows any authenticated user to access any memory.
+     * @allow (get, list) - Allow any user to read any memory.
+     * @allow (create, update, delete) - Allow only authenticated users to create, update, or delete memories.
+     * @deny (create, update, delete) - Deny unauthenticated users from creating, updating or deleting memories.
+     * @principle Allows public read access, but restricts write access to authenticated users.
      */
     match /memories/{memoryId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
 
-    function isSignedIn() {
-      return request.auth != null;
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
   }
 }
