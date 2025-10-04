@@ -6,9 +6,12 @@ import {
   updateDoc,
   arrayUnion,
   serverTimestamp,
+  writeBatch,
+  type Firestore,
 } from 'firebase/firestore';
 import { initializeFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import type { User } from 'firebase/auth';
+import type { DatedSentence } from './daily-content';
 
 const { firestore: db } = initializeFirebase();
 
@@ -43,7 +46,6 @@ const getMemoryDocId = (date: Date): string => {
 export async function saveReaction(
   user: User,
   memoryDate: Date,
-  sentence: string,
   reaction: string | null
 ) {
   if (!user) return;
@@ -55,31 +57,16 @@ export async function saveReaction(
     const memorySnap = await getDoc(memoryRef);
     
     if (memorySnap.exists()) {
-      // Document exists, update the reactions array.
       let reactions = memorySnap.data().reactions || [];
-      // Remove existing reaction from the user
       reactions = reactions.filter((r: UserReaction) => r.userId !== user.uid);
-      // Add new reaction if one was provided
       if (reaction) {
         reactions.push({ userId: user.uid, reaction });
       }
       await updateDoc(memoryRef, { reactions });
-    } else {
-      // Document does not exist, create it.
-      const newReactions = reaction ? [{ userId: user.uid, reaction }] : [];
-      const newMemory: Memory = {
-        id: memoryId,
-        date: memoryDate.toISOString().split('T')[0],
-        sentence: sentence,
-        aiArtUrl: "https://picsum.photos/seed/placeholder/600/400",
-        reactions: newReactions,
-        chatMessages: [],
-      };
-      await setDoc(memoryRef, newMemory);
     }
   } catch (error) {
      const contextualError = new FirestorePermissionError({
-      operation: 'write',
+      operation: 'update',
       path: memoryRef.path,
     });
     errorEmitter.emit('permission-error', contextualError);
@@ -89,7 +76,6 @@ export async function saveReaction(
 export async function addChatMessage(
   user: User,
   memoryDate: Date,
-  sentence: string,
   text: string
 ) {
   if (!user) return;
@@ -109,28 +95,13 @@ export async function addChatMessage(
       timestamp: serverTimestamp(),
     };
 
-    const memorySnap = await getDoc(memoryRef);
-
-    if (memorySnap.exists()) {
-      // The document exists, so we just update the chatMessages array.
-      await updateDoc(memoryRef, {
-        chatMessages: arrayUnion(newMessage)
-      });
-    } else {
-      // The document does not exist, so we create it.
-      const newMemory: Memory = {
-        id: memoryId,
-        date: memoryDate.toISOString().split('T')[0],
-        sentence: sentence,
-        aiArtUrl: "https://picsum.photos/seed/placeholder/600/400",
-        reactions: [],
-        chatMessages: [newMessage],
-      };
-      await setDoc(memoryRef, newMemory);
-    }
+    await updateDoc(memoryRef, {
+      chatMessages: arrayUnion(newMessage)
+    });
+    
   } catch (error) {
     const contextualError = new FirestorePermissionError({
-      operation: 'write',
+      operation: 'update',
       path: memoryRef.path,
     });
     errorEmitter.emit('permission-error', contextualError);
@@ -164,4 +135,51 @@ export async function getAllMemoryReactions(
     errorEmitter.emit('permission-error', contextualError);
     return []; // Return empty array on error
   }
+}
+
+/**
+ * Ensures that a Firestore document exists for every sentence in daily-content.
+ * This is idempotent and can be called safely on every app load.
+ */
+export async function ensureMemoryDocuments(firestore: Firestore, allSentences: DatedSentence[]): Promise<void> {
+    try {
+        const batch = writeBatch(firestore);
+        
+        // We can't perform a get() in a batch, so we fetch all existing documents first.
+        // For larger apps, this could be optimized, but for a year's worth of data it's fine.
+        const existingDocsPromises = allSentences.map(sentence => {
+            const memoryId = getMemoryDocId(sentence.date);
+            const memoryRef = doc(firestore, 'memories', memoryId);
+            return getDoc(memoryRef);
+        });
+
+        const existingDocsSnapshots = await Promise.all(existingDocsPromises);
+
+        for (let i = 0; i < allSentences.length; i++) {
+            const sentence = allSentences[i];
+            const docSnapshot = existingDocsSnapshots[i];
+
+            // If the document does not exist, add it to the batch to be created.
+            if (!docSnapshot.exists()) {
+                const memoryId = getMemoryDocId(sentence.date);
+                const memoryRef = doc(firestore, 'memories', memoryId);
+                const newMemory: Memory = {
+                    id: memoryId,
+                    date: sentence.date.toISOString().split('T')[0],
+                    sentence: sentence.sentence,
+                    aiArtUrl: "https://picsum.photos/seed/placeholder/600/400", // Default placeholder
+                    reactions: [],
+                    chatMessages: [],
+                };
+                batch.set(memoryRef, newMemory);
+            }
+        }
+        
+        // Commit the batch to create all missing documents at once.
+        await batch.commit();
+    } catch (error) {
+        console.error("Error ensuring memory documents:", error);
+         // This is a background task, so we'll just log the error.
+         // A specific error could be emitted here if needed.
+    }
 }

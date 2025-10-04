@@ -35,11 +35,12 @@ import {
   addChatMessage,
   getAllMemoryReactions,
   getMemoryDocRef,
+  ensureMemoryDocuments,
   type ChatMessage,
   type UserReaction,
   type Memory,
 } from '@/lib/firebase-service';
-import { useUser, useAuth, useMemoFirebase, useDoc } from '@/firebase';
+import { useUser, useAuth, useMemoFirebase, useDoc, useFirestore } from '@/firebase';
 
 type DailyContent = {
   date: Date;
@@ -132,7 +133,7 @@ function FeedbackSection({ content }: { content: DailyContent }) {
     if (!user) return;
     setIsSending(true);
     const newEmoji = userReaction === emoji ? null : emoji;
-    await saveReaction(user, content.yearAgoDate, content.sentence, newEmoji);
+    await saveReaction(user, content.yearAgoDate, newEmoji);
     setIsSending(false);
   };
 
@@ -184,7 +185,7 @@ function ChatSection({ content, memoryData }: { content: DailyContent, memoryDat
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !user) return;
     setIsSending(true);
-    await addChatMessage(user, content.yearAgoDate, content.sentence, newMessage);
+    await addChatMessage(user, content.yearAgoDate, newMessage);
     setNewMessage('');
     setIsSending(false);
   };
@@ -233,8 +234,10 @@ function ChatSection({ content, memoryData }: { content: DailyContent, memoryDat
 
 function AuthWrapper({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
   const router = useRouter();
   const [historicalSentences, setHistoricalSentences] = useState<HistoricalEntryWithReactions[]>([]);
+  const [dataReady, setDataReady] = useState(false);
   const allSentences = useMemo(() => getAllSentences(), []);
   
   useEffect(() => {
@@ -244,9 +247,13 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   }, [user, isUserLoading, router]);
 
   useEffect(() => {
-    async function fetchHistoricalData() {
-        if (!user) return; // Don't fetch if user is not logged in
+    async function setupData() {
+        if (!user || !firestore) return;
 
+        // 1. Ensure all memory documents exist in Firestore.
+        await ensureMemoryDocuments(firestore, allSentences);
+
+        // 2. Fetch historical reactions for the UI.
         const today = new Date();
         const oneYearAgo = new Date(Date.UTC(today.getUTCFullYear() - 1, today.getUTCMonth(), today.getUTCDate()));
         
@@ -262,18 +269,19 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
             })
         );
         setHistoricalSentences(sentencesWithReactions);
+        setDataReady(true); // Mark data as ready
     }
     if (user) {
-        fetchHistoricalData();
+      setupData();
     }
-  }, [allSentences, user]);
+  }, [allSentences, user, firestore]);
 
 
-  if (isUserLoading || !user) {
+  if (isUserLoading || !user || !dataReady) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-background text-foreground">
         <LoadingSpinner className="h-12 w-12 text-primary" />
-        <p className="text-muted-foreground mt-4">Loading...</p>
+        <p className="text-muted-foreground mt-4">Loading user data...</p>
       </main>
     );
   }
