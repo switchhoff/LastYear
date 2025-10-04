@@ -62,12 +62,11 @@ const ensureMemoryDocExists = (userId: string, memoryDate: Date, sentence: strin
         date: memoryDate.toISOString().split('T')[0], // YYYY-MM-DD format
         sentence: sentence,
         aiArtUrl: "https://picsum.photos/seed/placeholder/600/400", // Placeholder URL
-        createdAt: serverTimestamp(),
     };
 
     // Use a non-blocking set with merge to create the doc if it doesn't exist,
-    // or update it with the required fields.
-    setDocumentNonBlocking(memoryRef, memoryData, { merge: true });
+    // or update it with the required fields. This now includes createdAt.
+    setDocumentNonBlocking(memoryRef, { ...memoryData, createdAt: serverTimestamp() }, { merge: true });
 };
 
 
@@ -83,6 +82,7 @@ export function saveReaction(
   ensureMemoryDocExists(userId, memoryDate, sentence);
 
   const memoryId = getMemoryDocId(memoryDate);
+  // The reaction document ID is the user's ID to ensure one reaction per user.
   const reactionRef = doc(db, 'users', userId, 'memories', memoryId, 'reactions', userId);
   setDocumentNonBlocking(reactionRef, { userId, reaction }, { merge: true });
 }
