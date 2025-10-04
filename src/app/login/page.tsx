@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/firebase';
 import {
-  initiateEmailSignIn,
-  initiateEmailSignUp,
-} from '@/firebase/non-blocking-login';
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+} from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -31,26 +32,46 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const handleAuthAction = (action: 'signIn' | 'signUp') => {
+  const handleSignIn = async () => {
     setLoading(true);
-    if (action === 'signIn') {
-      initiateEmailSignIn(auth, email, password);
-    } else {
-      if (!userName) {
-        toast({
-          variant: 'destructive',
-          title: 'Username required',
-          description: 'Please enter a username to sign up.',
-        });
-        setLoading(false);
-        return;
-      }
-      // Pass username to sign up function
-      initiateEmailSignUp(auth, email, password, userName);
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      router.push('/');
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Sign In Failed',
+        description: error.message || 'An unknown error occurred.',
+      });
+      setLoading(false);
     }
-    // Redirect immediately. The onAuthStateChanged listener will handle auth state.
-    router.push('/');
   };
+
+  const handleSignUp = async () => {
+    if (!userName) {
+      toast({
+        variant: 'destructive',
+        title: 'Username required',
+        description: 'Please enter a username to sign up.',
+      });
+      return;
+    }
+    setLoading(true);
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(userCredential.user, { displayName: userName });
+      // The onAuthStateChanged listener in FirebaseProvider will handle the user doc creation.
+      router.push('/');
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Sign Up Failed',
+        description: error.message || 'An unknown error occurred.',
+      });
+      setLoading(false);
+    }
+  };
+
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-background">
@@ -89,7 +110,7 @@ export default function LoginPage() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button onClick={() => handleAuthAction('signIn')} disabled={loading}>
+              <Button onClick={handleSignIn} disabled={loading}>
                 {loading ? <LoadingSpinner className="mr-2" /> : null}
                 Login
               </Button>
@@ -136,7 +157,7 @@ export default function LoginPage() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button onClick={() => handleAuthAction('signUp')} disabled={loading}>
+              <Button onClick={handleSignUp} disabled={loading}>
                 {loading ? <LoadingSpinner className="mr-2" /> : null}
                 Sign Up
               </Button>
