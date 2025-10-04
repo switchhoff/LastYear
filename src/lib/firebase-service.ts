@@ -50,22 +50,21 @@ export async function saveUserSentence(
   const memoryId = getMemoryDocId(date);
   const memoryRef = doc(firestore, 'memories', memoryId);
 
+  // Use dot notation to update a specific field in the map
   const dataToUpdate = { 
-    id: memoryId,
-    date: date.toISOString().split('T')[0],
-    userSentences: { [user.uid]: sentence }
+    [`userSentences.${user.uid}`]: sentence 
   };
   
   try {
-     // Use setDoc with merge to create the doc if it doesn't exist, 
-     // or update the user's sentence if it does.
+     // Use setDoc with merge to create the doc if it doesn't exist,
+     // or update just the user's sentence field.
     await setDoc(memoryRef, dataToUpdate, { merge: true });
 
   } catch (error) {
      const contextualError = new FirestorePermissionError({
       operation: 'write',
       path: memoryRef.path,
-      requestResourceData: { [`userSentences.${user.uid}`]: sentence }
+      requestResourceData: dataToUpdate
     });
     errorEmitter.emit('permission-error', contextualError);
   }
@@ -158,20 +157,19 @@ export async function ensureMemoryDocuments(firestore: Firestore, allSentences: 
         for (const sentence of allSentences) {
             const memoryId = getMemoryDocId(sentence.date);
             const memoryRef = doc(firestore, 'memories', memoryId);
-            const memorySnap = await getDoc(memoryRef);
-
-            if (!memorySnap.exists()) {
-                const newMemory: Memory = {
-                    id: memoryId,
-                    date: sentence.date.toISOString().split('T')[0],
-                    userSentences: {
-                      [ALEX_USER_ID]: sentence.sentence,
-                    },
-                    reactions: [],
-                    chatMessages: [],
-                };
-                batch.set(memoryRef, newMemory);
-            }
+            
+            // For existing docs, we'll merge the new data structure.
+            // For new docs, we'll create them with the new structure.
+            const newMemoryData = {
+                id: memoryId,
+                date: sentence.date.toISOString().split('T')[0],
+                userSentences: {
+                    [ALEX_USER_ID]: sentence.sentence,
+                },
+                reactions: [],
+                chatMessages: [],
+            };
+            batch.set(memoryRef, newMemoryData, { merge: true });
         }
         
         await batch.commit();
@@ -180,7 +178,6 @@ export async function ensureMemoryDocuments(firestore: Firestore, allSentences: 
     }
 }
 
+
 // Hardcoded user IDs for legacy data.
 const ALEX_USER_ID = '1xcBSDAluySuyeLwX5TEQnuiPMA2';
-
-    

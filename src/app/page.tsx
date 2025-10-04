@@ -253,7 +253,8 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
         displayDate.setUTCFullYear(displayDate.getUTCFullYear() + 1);
 
         if (displayDate <= todayUTC) {
-            const sentence = Object.values(memory.userSentences || {})[0] || "No sentence found.";
+            // Fallback for old data structure
+            const sentence = Object.values(memory.userSentences || {})[0] || (memory as any).sentence || "No sentence found.";
             
             combinedEntries.push({
                 date: memoryDate,
@@ -365,10 +366,19 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   const amalieReaction = useMemo(() => memoryData?.reactions.find(r => r.userId === AMALIE_USER_ID)?.reaction, [memoryData]);
   
   const effectiveSentence = useMemo(() => {
-    if (!memoryData?.userSentences) return null;
-    // Simple logic to get the first available sentence. Can be improved.
-    return Object.values(memoryData.userSentences)[0] || null;
+    if (!memoryData) return null;
+    // New structure: check userSentences map first
+    if (memoryData.userSentences && Object.keys(memoryData.userSentences).length > 0) {
+      // Simple logic to get the first available sentence. Can be improved.
+      return Object.values(memoryData.userSentences)[0];
+    }
+    // Fallback to old structure
+    if ((memoryData as any).sentence) {
+      return (memoryData as any).sentence;
+    }
+    return null;
   }, [memoryData]);
+
 
   const generateEmojis = useCallback((currentReaction: string | null, preserveSpot: boolean = false) => {
     const emojiPool = allEmojis.filter(e => e !== currentReaction);
@@ -419,14 +429,15 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     generateEmojis(userReaction, true);
   }
 
-  const fetchContent = useCallback(async (targetDisplayDate: Date) => {
+  const fetchContent = useCallback(async (targetDate: Date) => {
     try {
       setLoading(true);
       setShowContent(false);
       setContent(null);
 
-      const displayDate = new Date(Date.UTC(targetDisplayDate.getUTCFullYear(), targetDisplayDate.getUTCMonth(), targetDisplayDate.getUTCDate()));
-      const memoryDate = new Date(Date.UTC(displayDate.getUTCFullYear() - 1, displayDate.getUTCMonth(), displayDate.getUTCDate()));
+      const displayDate = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate()));
+      const memoryDate = new Date(displayDate);
+      memoryDate.setUTCFullYear(displayDate.getUTCFullYear() - 1);
       
       const today = new Date();
       const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
@@ -749,5 +760,3 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     </main>
   );
 }
-
-    
