@@ -34,14 +34,13 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   saveReaction,
   addChatMessage,
-  getMemoryDocRef,
   ensureMemoryDocuments,
   type UserReaction,
   type Memory,
   type UserMemoryChatMessage,
 } from '@/lib/firebase-service';
 import { useUser, useAuth, useMemoFirebase, useDoc, useFirestore, useCollection } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { collection, doc } from 'firebase/firestore';
 
 type DailyContent = {
   date: Date;
@@ -120,12 +119,17 @@ const positiveEmojis = ['😊', '❤️', '😂', '😍', '👍', '🥹', '🥰'
 
 function FeedbackSection({ content }: { content: DailyContent }) {
   const { user } = useUser();
+  const firestore = useFirestore();
   const [isSending, setIsSending] = useState(false);
   
   const memoryDocRef = useMemoFirebase(() => {
-    if (!content.yearAgoDate) return null;
-    return getMemoryDocRef(content.yearAgoDate);
-  }, [content.yearAgoDate]);
+    if (!firestore || !content.yearAgoDate) return null;
+    const day = String(content.yearAgoDate.getUTCDate()).padStart(2, '0');
+    const month = String(content.yearAgoDate.getUTCMonth() + 1).padStart(2, '0');
+    const year = content.yearAgoDate.getUTCFullYear();
+    const memoryId = `${year}-${month}-${day}`;
+    return doc(firestore, 'memories', memoryId);
+  }, [firestore, content.yearAgoDate]);
 
   const { data: memoryData } = useDoc<Memory>(memoryDocRef);
   
@@ -145,10 +149,10 @@ function FeedbackSection({ content }: { content: DailyContent }) {
   }, [userReaction]);
 
   const handleReact = async (emoji: string) => {
-    if (!user) return;
+    if (!user || !firestore) return;
     setIsSending(true);
     const newEmoji = userReaction === emoji ? null : emoji;
-    await saveReaction(user, content.yearAgoDate, newEmoji);
+    await saveReaction(firestore, user, content.yearAgoDate, newEmoji);
     setIsSending(false);
   };
 
@@ -185,6 +189,7 @@ function FeedbackSection({ content }: { content: DailyContent }) {
 
 function ChatSection({ content, memoryData }: { content: DailyContent, memoryData: Memory | null }) {
   const { user } = useUser();
+  const firestore = useFirestore();
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -193,14 +198,17 @@ function ChatSection({ content, memoryData }: { content: DailyContent, memoryDat
   
   useEffect(() => {
     if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+      const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (viewport) {
+        viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
+      }
     }
   }, [messages]);
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !user) return;
+    if (!newMessage.trim() || !user || !firestore) return;
     setIsSending(true);
-    await addChatMessage(user, content.yearAgoDate, newMessage);
+    await addChatMessage(firestore, user, content.yearAgoDate, newMessage);
     setNewMessage('');
     setIsSending(false);
   };
@@ -222,11 +230,9 @@ function ChatSection({ content, memoryData }: { content: DailyContent, memoryDat
                   isCurrentUser
                     ? 'self-end items-end'
                     : 'self-start items-start',
-                  isAlex && 'bg-yellow-200 text-black',
-                  isAmalie && 'bg-pink-200 text-black',
-                  // Default for current user if not Alex or Amalie
-                  isCurrentUser && !isAlex && !isAmalie && 'bg-primary text-primary-foreground',
-                  // Default for other users if not Alex or Amalie
+                  isAlex && !isCurrentUser && 'bg-yellow-200 text-black',
+                  isAmalie && !isCurrentUser && 'bg-pink-200 text-black',
+                  isCurrentUser && 'bg-primary text-primary-foreground',
                   !isCurrentUser && !isAlex && !isAmalie && 'bg-background'
                 )}
               >
@@ -581,3 +587,5 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     </main>
   );
 }
+
+    
