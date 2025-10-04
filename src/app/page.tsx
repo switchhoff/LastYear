@@ -572,7 +572,9 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
               </h1>
             </div>
             
-            <div className="relative bg-card border rounded-lg shadow-sm p-8 max-w-2xl">
+            <div className="relative bg-card border rounded-lg shadow-sm p-12 max-w-2xl min-h-[250px] flex items-center justify-center">
+                 <span className="absolute top-4 left-4 text-6xl text-primary/10 font-serif">“</span>
+                 <span className="absolute bottom-4 right-4 text-6xl text-primary/10 font-serif">”</span>
                 <div className="absolute top-0 right-0 -mt-4 -mr-2 flex gap-1 items-center">
                     {alexReaction && <Badge className="text-lg p-1.5 bg-yellow-200 text-black shadow-md">{alexReaction}</Badge>}
                     {amalieReaction && <Badge className="text-lg p-1.5 bg-pink-200 text-black shadow-md">{amalieReaction}</Badge>}
@@ -616,9 +618,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
                 </div>
                 <blockquote className="relative">
                   <p className="text-2xl md:text-3xl text-primary italic text-balance">
-                    <span className="absolute -left-4 -top-2 text-6xl text-primary/20 font-serif">“</span>
                     {content.sentence}
-                    <span className="absolute -right-4 -bottom-4 text-6xl text-primary/20 font-serif">”</span>
                   </p>
                 </blockquote>
             </div>
@@ -660,4 +660,5 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
       )}
     </main>
   );
-}
+
+    
