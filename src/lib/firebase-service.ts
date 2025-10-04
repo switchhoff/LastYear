@@ -12,6 +12,7 @@ import {
   orderBy,
   serverTimestamp,
   where,
+  writeBatch,
 } from 'firebase/firestore';
 import {
   setDocumentNonBlocking,
@@ -49,12 +50,29 @@ const getMemoryDocId = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
+// Helper to ensure the parent memory document exists before writing a subcollection.
+const ensureMemoryDocExists = async (userId: string, memoryDate: Date) => {
+    if (!userId) return;
+    const memoryId = getMemoryDocId(memoryDate);
+    const memoryRef = doc(db, 'users', userId, 'memories', memoryId);
+    
+    // Use a non-blocking set with merge to create the doc if it doesn't exist,
+    // or do nothing if it does. This avoids a read operation.
+    // We add a `createdAt` timestamp to have some data in the document.
+    setDocumentNonBlocking(memoryRef, { createdAt: serverTimestamp() }, { merge: true });
+};
+
+
 export function saveReaction(
   userId: string,
   memoryDate: Date,
   reaction: string | null
 ) {
   if (!userId) return;
+
+  // Ensure the parent memory document exists before saving a reaction.
+  ensureMemoryDocExists(userId, memoryDate);
+
   const memoryId = getMemoryDocId(memoryDate);
   const reactionRef = doc(db, 'users', userId, 'memories', memoryId, 'reactions', userId);
   setDocumentNonBlocking(reactionRef, { userId, reaction }, { merge: true });
@@ -67,6 +85,10 @@ export function addChatMessage(
   text: string
 ) {
   if (!userId) return;
+
+  // Ensure the parent memory document exists before adding a chat message.
+  ensureMemoryDocExists(userId, memoryDate);
+
   const memoryId = getMemoryDocId(memoryDate);
   const chatCollectionRef = collection(
     db,
@@ -127,6 +149,7 @@ export const getMemoryReactionsForDate = async (
   userId: string,
   date: Date
 ): Promise<UserReaction[]> => {
+  if (!userId) return [];
   const result = await getMemoryReactions(userId, date);
   if (result.success && result.reactions) {
     return result.reactions;
