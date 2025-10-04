@@ -238,26 +238,30 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   const historicalSentences = useMemo((): HistoricalEntryWithReactions[] => {
     if (!memories) return [];
     
-    // We'll use the static sentences as a base and enrich them
     const staticSentencesMap = new Map(allSentences.map(s => [getMemoryDocId(s.date), s.sentence]));
     const memoriesMap = new Map(memories.map(m => [m.id, m]));
-    
     const combinedEntries: HistoricalEntryWithReactions[] = [];
 
-    // Prioritize memories from DB, but fall back to static
-    memoriesMap.forEach((memory, id) => {
-      const dateParts = id.split('-').map(Number);
-      const date = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2]));
+    const today = new Date();
+    const todayUTC = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
 
-      // Get sentence from any user in the memory, or fallback to static list
-      const sentence = Object.values(memory.userSentences || {})[0] || staticSentencesMap.get(id) || "No sentence found.";
-      
-      combinedEntries.push({
-        date,
-        sentence,
-        reactions: memory.reactions || [],
-        chatMessages: memory.chatMessages || [],
-      });
+    memoriesMap.forEach((memory, id) => {
+        const dateParts = id.split('-').map(Number);
+        const memoryDate = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2]));
+        
+        const displayDate = new Date(memoryDate);
+        displayDate.setUTCFullYear(displayDate.getUTCFullYear() + 1);
+
+        if (displayDate <= todayUTC) {
+            const sentence = Object.values(memory.userSentences || {})[0] || staticSentencesMap.get(id) || "No sentence found.";
+            
+            combinedEntries.push({
+                date: memoryDate,
+                sentence,
+                reactions: memory.reactions || [],
+                chatMessages: memory.chatMessages || [],
+            });
+        }
     });
 
     return combinedEntries.sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -274,7 +278,6 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     async function setupData() {
         if (!user || !firestore) return;
-        // This can pre-populate memories from the static list if they don't exist
         await ensureMemoryDocuments(firestore, allSentences);
         setDataReady(true);
     }
@@ -743,3 +746,5 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     </main>
   );
 }
+
+    
