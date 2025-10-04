@@ -414,6 +414,13 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   const auth = useAuth();
   const firestore = useFirestore();
 
+  const getMemoryDocId = (date: Date): string => {
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const year = date.getUTCFullYear();
+    return `${year}-${month}-${day}`;
+  };
+
   const memoryDocRef = useMemoFirebase(() => {
     if (!firestore || !content) return null;
     const memoryId = getMemoryDocId(content.yearAgoDate);
@@ -425,13 +432,6 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   const alexReaction = useMemo(() => memoryData?.reactions.find(r => r.userId === ALEX_USER_ID)?.reaction, [memoryData]);
   const amalieReaction = useMemo(() => memoryData?.reactions.find(r => r.userId === AMALIE_USER_ID)?.reaction, [memoryData]);
 
-  const getMemoryDocId = (date: Date): string => {
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const year = date.getUTCFullYear();
-    return `${year}-${month}-${day}`;
-  };
-  
   const fetchContent = useCallback(async (date: Date) => {
     try {
       setLoading(true);
@@ -676,3 +676,6 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
 }
 
 
+
+
+    
