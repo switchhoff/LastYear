@@ -1,73 +1,103 @@
 /**
- * @fileoverview Firestore Security Rules for the application.
+ * @fileoverview Firestore Security Rules for Prototyping.
  *
  * Core Philosophy:
- * This ruleset prioritizes open access to memories while enforcing user-ownership
- * for user profiles.
+ * This ruleset prioritizes rapid prototyping and ease of access while maintaining
+ * a baseline level of authorization security. It enforces user-ownership for
+ * user profiles and allows open access to shared memories. Data validation is
+ * minimized to facilitate quick iteration.
  *
  * Data Structure:
- * - /users/{userId}: Stores individual user profiles. Access is restricted to
- *   the owner of the profile.
- * - /memories/{memoryId}: Stores shared memories, accessible for reading and
- *   writing by any authenticated user.
+ * - /users/{userId}: Stores user profiles, accessible only by the owning user.
+ * - /memories/{memoryId}: Stores shared memories, accessible by any
+ *   authenticated user.
  *
  * Key Security Decisions:
- * - Memories are publicly accessible for both read and write operations, allowing
- *   any authenticated user to view and contribute.
- * - User profiles are strictly controlled, allowing only the owning user to
- *   modify their data.
- * - The rules do not currently enforce any schema validation beyond ownership
- *   and authenticated user checks to allow rapid prototyping.
+ * - User listing is disallowed.
+ * - Memories are publicly readable and writable by authenticated users.
+ * - Data validation is relaxed to enable rapid schema changes. Only ownership
+ *   and relational integrity are validated.
+ *
+ * Denormalization for Authorization:
+ *   Not applicable in this simple ruleset.
+ *
+ * Structural Segregation:
+ *   Uses separate collections for user profiles (private) and shared memories
+ *   (public).
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows access to memory documents for any authenticated user.
-     * @path /memories/{memoryId}
-     * @allow (get, list) Any authenticated user can read memories.
-     * @allow (create) Any authenticated user can create memories.
-     * @allow (update) Any authenticated user can update memories.
-     * @allow (delete) Any authenticated user can delete memories.
-     * @deny (create, update, delete) Operations that are not authenticated.
-     * @principle Allows any authenticated user to perform CRUD operations on memories.
+     * @description Enforces user-ownership for user profiles. Only the
+     *   authenticated user can read, create, update, or delete their own
+     *   profile.
+     * @path /users/{userId}
+     * @allow (create) - User 'user_abc' creates their own profile with
+     *   userId: 'user_abc'.
+     * @allow (get) - User 'user_abc' reads their own profile.
+     * @allow (update) - User 'user_abc' updates their own profile.
+     * @allow (delete) - User 'user_abc' deletes their own profile.
+     * @deny (create) - User 'user_xyz' attempts to create a profile with
+     *   userId: 'user_abc'.
+     * @deny (get) - User 'user_xyz' attempts to read user 'user_abc' profile.
+     * @deny (update) - User 'user_xyz' attempts to update user 'user_abc'
+     *   profile.
+     * @deny (delete) - User 'user_xyz' attempts to delete user 'user_abc'
+     *   profile.
+     * @principle Enforces document ownership for all operations.
      */
-    match /memories/{memoryId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+    match /users/{userId} {
+      // Allow a user to create their own profile if the userId matches their
+      // auth UID.
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == userId;
+      // Allow a user to get their own profile.
+      allow get: if isSignedIn() && isOwner(userId);
+      // Allow a user to list their own profile.
+      allow list: if false;
+      // Allow a user to update their own profile if it exists and they are the
+      // owner. Enforce immutability of the user ID.
+      allow update: if isSignedIn() && isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      // Allow a user to delete their own profile if it exists and they are the
+      // owner.
+      allow delete: if isSignedIn() && isExistingOwner(userId);
     }
 
     /**
-     * @description Controls access to user profile documents.
-     * @path /users/{userId}
-     * @allow (get, list) Only the owner can read.
-     * @allow (create) The user can create their own profile (self-creation).
-     * @allow (update, delete) Only the owner can modify or delete.
-     * @deny (create) If the user tries to create a profile with a mismatched userId.
-     * @deny (update, delete) If the user is not the owner or the document does not exist.
-     * @principle Enforces strict user-ownership for profile management.
+     * @description Allows any authenticated user to read and write shared
+     *   memories.
+     * @path /memories/{memoryId}
+     * @allow (create) - Any authenticated user can create a memory.
+     * @allow (get) - Any user can read any memory
+     * @allow (update) - Any authenticated user can update a memory.
+     * @allow (delete) - Any authenticated user can delete a memory.
+     * @allow (list) - Any user can list memories.
+     * @principle Allows public read access with authenticated write access.
      */
-    match /users/{userId} {
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
+    match /memories/{memoryId} {
+      allow create: if isSignedIn();
+      allow get: if true;
+      allow list: if true;
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
+  }
 
-    // Helper functions
-    function isSignedIn() {
-      return request.auth != null;
-    }
+  // Helper function to determine if the user is signed in.
+  function isSignedIn() {
+    return request.auth != null;
+  }
 
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
+  // Helper function to determine if the request is made by the owner of the
+  // document.
+  function isOwner(userId) {
+    return request.auth.uid == userId;
+  }
 
+    // Helper function to determine if the request is made by the owner of an
+    // existing document.
     function isExistingOwner(userId) {
         return isOwner(userId) && resource != null;
     }
-  }
 }
