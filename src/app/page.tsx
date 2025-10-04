@@ -45,15 +45,15 @@ import {
   type UserMemoryChatMessage,
 } from '@/lib/firebase-service';
 import { useUser, useAuth, useMemoFirebase, useDoc, useFirestore, useCollection } from '@/firebase';
-import { collection, doc, query, collectionGroup } from 'firebase/firestore';
+import { collection, doc } from 'firebase/firestore';
 
 type DailyContent = {
   displayDate: Date;
   memoryDate: Date;
   dateString: string;
-  sentence: string | null; // Sentence can be null if not found
+  sentence: string | null; // This is now less important, will be derived from hooks
   memorableDate: MemorableDate | undefined;
-  userSentence: string | null;
+  userSentence: string | null; // This is now less important
   isToday: boolean;
 };
 
@@ -429,12 +429,11 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
       
       const memorableDate = getMemorableDate(displayDate);
 
-      // Now we just set up the date info. Sentences are fetched via useDoc.
       setContent({
         displayDate,
         memoryDate,
         dateString,
-        sentence: null, // This will be filled by the hook
+        sentence: null,
         memorableDate,
         userSentence: null,
         isToday,

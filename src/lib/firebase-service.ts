@@ -7,7 +7,6 @@ import {
   arrayUnion,
   writeBatch,
   type Firestore,
-  collection,
 } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
 import type { DatedSentence } from './daily-content';
@@ -176,7 +175,6 @@ export async function ensureMemoryDocuments(firestore: Firestore, allSentences: 
                     id: memoryId,
                     date: sentence.date.toISOString().split('T')[0],
                     userSentences: {
-                      // This is a placeholder, assuming Alex is the author of static content
                       [ALEX_USER_ID]: sentence.sentence,
                     },
                     reactions: [],
