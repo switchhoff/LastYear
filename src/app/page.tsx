@@ -39,7 +39,9 @@ import {
   type UserReaction,
   getMemoryReactionsForDate,
 } from '@/lib/firebase-service';
-import { useUser, useCollection, useAuth, useMemoFirebase } from '@/firebase';
+import { useUser, useCollection, useAuth, useMemoFirebase, useFirestore } from '@/firebase';
+import { collection, query, where, getDocs, doc, onSnapshot } from 'firebase/firestore';
+
 
 type DailyContent = {
   date: Date;
@@ -101,15 +103,24 @@ function HistoricalEntry({
 
 const positiveEmojis = ['😊', '❤️', '😂', '😍', '👍', '🥹', '🥰', '🎉', '🤩'];
 
+const getMemoryDocId = (date: Date): string => {
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const year = date.getUTCFullYear();
+    return `${year}-${month}-${day}`;
+};
+
 function FeedbackSection({ content }: { content: DailyContent }) {
   const { user } = useUser();
+  const firestore = useFirestore();
   const [isSending, setIsSending] = useState(false);
-  const { toast } = useToast();
+  
+  const memoryReactionsQuery = useMemoFirebase(() => {
+    if (!firestore || !content.yearAgoDate) return null;
+    const memoryId = getMemoryDocId(content.yearAgoDate);
+    return collection(firestore, 'memories', memoryId, 'reactions');
+  }, [firestore, content.yearAgoDate]);
 
-  const memoryReactionsQuery = useMemoFirebase(
-    () => getChatMessagesQuery(content.yearAgoDate),
-    [content.yearAgoDate]
-  );
   const { data: reactionsData } = useCollection<UserReaction>(memoryReactionsQuery);
 
   const userReaction = useMemo(() => {
@@ -126,7 +137,7 @@ function FeedbackSection({ content }: { content: DailyContent }) {
     return shuffled.slice(0, 5);
   }, [userReaction]);
 
-  const handleReact = async (emoji: string) => {
+  const handleReact = (emoji: string) => {
     if (!user) return;
     const newEmoji = userReaction === emoji ? null : emoji;
     // Non-blocking update
@@ -182,10 +193,10 @@ function ChatSection({ content }: { content: DailyContent }) {
     }
   }, [messages]);
 
-  const handleSendMessage = async () => {
+  const handleSendMessage = () => {
     if (!newMessage.trim() || !user) return;
     setIsSending(true);
-    await addChatMessage(user.uid, user.email || 'anonymous', content.yearAgoDate, newMessage);
+    addChatMessage(user.uid, user.email || 'anonymous', content.yearAgoDate, newMessage);
     setNewMessage('');
     setIsSending(false);
   };
@@ -270,7 +281,7 @@ export default function Home() {
   
   const allSentences = useMemo(() => getAllSentences(), []);
 
-  const fetchContent = async (date: Date) => {
+  const fetchContent = useCallback(async (date: Date) => {
     try {
       setLoading(true);
       setShowContent(false);
@@ -320,18 +331,18 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
-  const fetchTodaysContent = () => {
+  const fetchTodaysContent = useCallback(() => {
     const today = new Date();
     const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
     fetchContent(todayUTC);
     setIsViewingHistorical(false);
-  }
+  },[fetchContent]);
 
   useEffect(() => {
     fetchTodaysContent();
-  }, []);
+  }, [fetchTodaysContent]);
 
 
   useEffect(() => {
@@ -521,3 +532,4 @@ export default function Home() {
     </AuthWrapper>
   );
 }
+

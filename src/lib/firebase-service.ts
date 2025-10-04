@@ -16,7 +16,7 @@ import {
   setDocumentNonBlocking,
   addDocumentNonBlocking,
 } from '@/firebase/non-blocking-updates';
-import { initializeFirebase } from '@/firebase';
+import { initializeFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 
 const { firestore: db } = initializeFirebase();
 
@@ -48,53 +48,35 @@ const getMemoryDocId = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-export async function saveReaction(
+export function saveReaction(
   userId: string,
   memoryDate: Date,
   reaction: string | null
 ) {
-  try {
-    const memoryId = getMemoryDocId(memoryDate);
-    const reactionRef = doc(db, 'memories', memoryId, 'reactions', userId);
-    setDocumentNonBlocking(reactionRef, { userId, reaction }, { merge: true });
-    return { success: true };
-  } catch (error) {
-    console.error('Error saving reaction:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'An unknown error occurred.',
-    };
-  }
+  const memoryId = getMemoryDocId(memoryDate);
+  const reactionRef = doc(db, 'memories', memoryId, 'reactions', userId);
+  setDocumentNonBlocking(reactionRef, { userId, reaction }, { merge: true });
 }
 
-export async function addChatMessage(
-  userId: string,
+export function addChatMessage(
+  userId:string,
   userEmail: string,
   memoryDate: Date,
   text: string
 ) {
-  try {
-    const memoryId = getMemoryDocId(memoryDate);
-    const chatCollectionRef = collection(
-      db,
-      'memories',
-      memoryId,
-      'chat_messages'
-    );
-    addDocumentNonBlocking(chatCollectionRef, {
-      userId,
-      userEmail,
-      text,
-      timestamp: serverTimestamp(),
-    });
-    return { success: true };
-  } catch (error) {
-    console.error('Error adding chat message:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'An unknown error occurred.',
-    };
-  }
+  const memoryId = getMemoryDocId(memoryDate);
+  const chatCollectionRef = collection(
+    db,
+    'memories',
+    memoryId,
+    'chat_messages'
+  );
+  addDocumentNonBlocking(chatCollectionRef, {
+    userId,
+    userEmail,
+    text,
+    timestamp: serverTimestamp(),
+  });
 }
 
 export async function getMemoryReactions(
@@ -110,8 +92,13 @@ export async function getMemoryReactions(
     );
     return { success: true, reactions };
   } catch (error) {
-    console.error('Error getting reactions:', error);
-    return { success: false, error: 'Could not fetch reactions.' };
+    const memoryId = getMemoryDocId(memoryDate);
+    const contextualError = new FirestorePermissionError({
+      operation: 'list',
+      path: `memories/${memoryId}/reactions`,
+    })
+    errorEmitter.emit('permission-error', contextualError);
+    return { success: false, error: contextualError.message };
   }
 }
 
