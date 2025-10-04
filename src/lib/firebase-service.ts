@@ -51,7 +51,7 @@ export async function saveUserSentence(
   date: Date,
   sentence: string
 ) {
-  if (!user || !sentence.trim()) return;
+  if (!user) return;
 
   const memoryId = getMemoryDocId(date);
   const userMemoryRef = doc(firestore, 'userMemories', memoryId, 'users', user.uid);
