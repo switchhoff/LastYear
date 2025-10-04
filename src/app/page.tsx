@@ -51,9 +51,7 @@ type DailyContent = {
   displayDate: Date;
   memoryDate: Date;
   dateString: string;
-  sentence: string | null; // This is now less important, will be derived from hooks
   memorableDate: MemorableDate | undefined;
-  userSentence: string | null; // This is now less important
   isToday: boolean;
 };
 
@@ -151,11 +149,9 @@ function ChatSection({ content, memoryData }: { content: DailyContent, memoryDat
   const messages = useMemo(() => memoryData?.chatMessages || [], [memoryData]);
   
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (viewport) {
-        viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
-      }
+    const viewport = scrollAreaRef.current?.querySelector<HTMLDivElement>('[data-radix-scroll-area-viewport]');
+    if (viewport) {
+      viewport.scrollTop = viewport.scrollHeight;
     }
   }, [messages]);
 
@@ -238,7 +234,6 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   const historicalSentences = useMemo((): HistoricalEntryWithReactions[] => {
     if (!memories) return [];
     
-    const staticSentencesMap = new Map(allSentences.map(s => [getMemoryDocId(s.date), s.sentence]));
     const memoriesMap = new Map(memories.map(m => [m.id, m]));
     const combinedEntries: HistoricalEntryWithReactions[] = [];
 
@@ -253,7 +248,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
         displayDate.setUTCFullYear(displayDate.getUTCFullYear() + 1);
 
         if (displayDate <= todayUTC) {
-            const sentence = Object.values(memory.userSentences || {})[0] || staticSentencesMap.get(id) || "No sentence found.";
+            const sentence = Object.values(memory.userSentences || {})[0] || "No sentence found.";
             
             combinedEntries.push({
                 date: memoryDate,
@@ -266,7 +261,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
 
     return combinedEntries.sort((a, b) => b.date.getTime() - a.date.getTime());
 
-  }, [allSentences, memories]);
+  }, [memories]);
 
 
   useEffect(() => {
@@ -337,10 +332,11 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   }, [firestore, content]);
   
   const userMemoryDocRef = useMemoFirebase(() => {
-    if (!firestore || !content || !user) return null;
-    const memoryId = getMemoryDocId(content.memoryDate);
+    if (!firestore || !user) return null;
+    // We always save to today's date for user memories
+    const memoryId = getMemoryDocId(new Date());
     return doc(firestore, 'userMemories', memoryId, 'users', user.uid);
-  }, [firestore, content, user]);
+  }, [firestore, user]);
 
   const { data: memoryData } = useDoc<Memory>(memoryDocRef);
   const { data: userMemoryData } = useDoc<{sentence: string}>(userMemoryDocRef);
@@ -353,46 +349,45 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   const alexReaction = useMemo(() => memoryData?.reactions.find(r => r.userId === ALEX_USER_ID)?.reaction, [memoryData]);
   const amalieReaction = useMemo(() => memoryData?.reactions.find(r => r.userId === AMALIE_USER_ID)?.reaction, [memoryData]);
   
-  const otherUserSentence = useMemo(() => {
-    if (!memoryData?.userSentences || !user) return null;
-    const otherUserId = user.uid === ALEX_USER_ID ? AMALIE_USER_ID : ALEX_USER_ID;
-    return memoryData.userSentences[otherUserId] || null;
-  }, [memoryData, user]);
+  const effectiveSentence = useMemo(() => {
+    if (!memoryData?.userSentences) return null;
+    // Simple logic to get the first available sentence. Can be improved.
+    return Object.values(memoryData.userSentences)[0] || null;
+  }, [memoryData]);
 
   const generateEmojis = useCallback((currentReaction: string | null, preserveSpot: boolean = false) => {
     const emojiPool = allEmojis.filter(e => e !== currentReaction);
     const shuffled = [...emojiPool].sort(() => 0.5 - Math.random());
     
-    const emojisToPick = preserveSpot && currentReaction ? 4 : 5;
-    let newEmojis = shuffled.slice(0, emojisToPick);
+    let newEmojis = shuffled.slice(0, 5);
 
     if (preserveSpot && currentReaction) {
+        // Try to keep the current reaction in the same spot if it exists in the old list
         const currentReactionIndex = displayedEmojis.indexOf(currentReaction);
         if (currentReactionIndex !== -1) {
-            const finalEmojis = [...newEmojis];
-            newEmojis = newEmojis.filter(e => e !== currentReaction);
-            finalEmojis.splice(currentReactionIndex, 0, currentReaction);
-            const finalDisplay = finalEmojis.slice(0,5);
-             if(!finalDisplay.includes(currentReaction)) {
-              finalDisplay[currentReactionIndex] = currentReaction;
-            }
-            setDisplayedEmojis(finalDisplay);
+            newEmojis = newEmojis.filter(e => e !== currentReaction); // remove duplicates
+            newEmojis.splice(currentReactionIndex, 0, currentReaction);
+            setDisplayedEmojis(newEmojis.slice(0,5)); // ensure it's still 5
         } else {
+             // If not in old list, just replace a random one
              if (!newEmojis.includes(currentReaction)) {
-              newEmojis[Math.floor(Math.random() * newEmojis.length)] = currentReaction;
-            }
-            setDisplayedEmojis(newEmojis);
+                newEmojis[Math.floor(Math.random() * newEmojis.length)] = currentReaction;
+             }
+             setDisplayedEmojis(newEmojis);
         }
     } else {
         if (currentReaction && !newEmojis.includes(currentReaction)) {
           newEmojis[Math.floor(Math.random() * newEmojis.length)] = currentReaction;
         }
-        setDisplayedEmojis(newEmojis.slice(0,5));
+        setDisplayedEmojis(newEmojis);
     }
   }, [displayedEmojis]);
 
+
   useEffect(() => {
-    generateEmojis(userReaction);
+    if (content) { // Generate emojis when content is loaded
+      generateEmojis(userReaction, false);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, userReaction]);
 
@@ -433,9 +428,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
         displayDate,
         memoryDate,
         dateString,
-        sentence: null,
         memorableDate,
-        userSentence: null,
         isToday,
       });
 
@@ -495,13 +488,13 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   const handleSaveSentence = async () => {
     if (!user || !firestore || !content || !newUserSentence.trim()) return;
     setIsSending(true);
-    await saveUserSentence(firestore, user, content.displayDate, newUserSentence);
+    // Always save for *today's* date
+    await saveUserSentence(firestore, user, new Date(), newUserSentence);
     setIsSending(false);
     setMode('view');
     toast({ title: "Memory saved!" });
   };
   
-  const effectiveSentence = userMemoryData?.sentence || otherUserSentence;
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-background text-foreground">
@@ -683,7 +676,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
                 </blockquote>
             </div>
 
-            {showFeedback && <ChatSection content={content} memoryData={memoryData} />}
+            {showFeedback && memoryData && <ChatSection content={content} memoryData={memoryData} />}
           </div>
         ) : content && mode === 'add' ? (
            <div className={cn(
@@ -745,3 +738,5 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     </main>
   );
 }
+
+    
