@@ -198,14 +198,24 @@ function ChatSection({ content, memoryData }: { content: DailyContent, memoryDat
       <ScrollArea className="flex-grow mb-4 pr-4" ref={scrollAreaRef}>
         <div className="flex flex-col gap-4">
           {messages?.map((msg: UserMemoryChatMessage, index) => {
+            const isCurrentUser = msg.userId === user?.uid;
+            const isAlex = msg.userId === ALEX_USER_ID;
+            const isAmalie = msg.userId === AMALIE_USER_ID;
+
             return (
               <div
                 key={index}
                 className={cn(
                   'flex flex-col max-w-[75%] p-2 px-3 rounded-lg',
-                  msg.userId === user?.uid
-                    ? 'bg-primary text-primary-foreground self-end items-end'
-                    : 'bg-background self-start items-start'
+                  isCurrentUser
+                    ? 'self-end items-end'
+                    : 'self-start items-start',
+                  isAlex && 'bg-yellow-200 text-black',
+                  isAmalie && 'bg-pink-200 text-black',
+                  // Default for current user if not Alex or Amalie
+                  isCurrentUser && !isAlex && !isAmalie && 'bg-primary text-primary-foreground',
+                  // Default for other users if not Alex or Amalie
+                  !isCurrentUser && !isAlex && !isAmalie && 'bg-background'
                 )}
               >
                 <span className="text-xs text-muted-foreground">{msg.userName}</span>
@@ -557,3 +567,5 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     </main>
   );
 }
+
+    
