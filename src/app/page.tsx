@@ -116,10 +116,10 @@ function FeedbackSection({ content }: { content: DailyContent }) {
   const [isSending, setIsSending] = useState(false);
   
   const memoryReactionsQuery = useMemoFirebase(() => {
-    if (!firestore || !content.yearAgoDate) return null;
+    if (!firestore || !content.yearAgoDate || !user) return null;
     const memoryId = getMemoryDocId(content.yearAgoDate);
-    return collection(firestore, 'memories', memoryId, 'reactions');
-  }, [firestore, content.yearAgoDate]);
+    return collection(firestore, 'users', user.uid, 'memories', memoryId, 'reactions');
+  }, [firestore, user, content.yearAgoDate]);
 
   const { data: reactionsData } = useCollection<UserReaction>(memoryReactionsQuery);
 
@@ -184,7 +184,7 @@ function ChatSection({ content }: { content: DailyContent }) {
   const messagesQuery = useMemoFirebase(
     () => {
         if (!user) return null;
-        return getChatMessagesQuery(content.yearAgoDate)
+        return getChatMessagesQuery(user.uid, content.yearAgoDate)
     },
     [content.yearAgoDate, user]
   );
@@ -281,6 +281,7 @@ export default function Home() {
   const [historicalSentences, setHistoricalSentences] = useState<HistoricalEntryWithReactions[]>([]);
   const { toast } = useToast();
   const auth = useAuth();
+  const { user } = useUser();
   
   const allSentences = useMemo(() => getAllSentences(), []);
 
@@ -350,6 +351,7 @@ export default function Home() {
 
   useEffect(() => {
     async function fetchHistoricalData() {
+        if (!user) return;
         const today = new Date();
         const oneYearAgo = new Date(Date.UTC(today.getUTCFullYear() - 1, today.getUTCMonth(), today.getUTCDate()));
         
@@ -360,14 +362,14 @@ export default function Home() {
 
         const sentencesWithReactions = await Promise.all(
             relevantSentences.map(async (entry) => {
-                const reactions = await getMemoryReactionsForDate(entry.date);
+                const reactions = await getMemoryReactionsForDate(user.uid, entry.date);
                 return { ...entry, reactions };
             })
         );
         setHistoricalSentences(sentencesWithReactions);
     }
     fetchHistoricalData();
-  }, [allSentences]);
+  }, [allSentences, user]);
 
 
   useEffect(() => {
