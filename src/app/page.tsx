@@ -182,8 +182,11 @@ function ChatSection({ content }: { content: DailyContent }) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const messagesQuery = useMemoFirebase(
-    () => getChatMessagesQuery(content.yearAgoDate),
-    [content.yearAgoDate]
+    () => {
+        if (!user) return null;
+        return getChatMessagesQuery(content.yearAgoDate)
+    },
+    [content.yearAgoDate, user]
   );
   const { data: messages, isLoading } = useCollection<ChatMessage>(messagesQuery);
   
@@ -532,4 +535,3 @@ export default function Home() {
     </AuthWrapper>
   );
 }
-

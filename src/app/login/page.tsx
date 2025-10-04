@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/firebase';
 import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-} from 'firebase/auth';
+  initiateEmailSignIn,
+  initiateEmailSignUp,
+} from '@/firebase/non-blocking-login';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -30,24 +30,15 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const handleAuthAction = async (action: 'signIn' | 'signUp') => {
+  const handleAuthAction = (action: 'signIn' | 'signUp') => {
     setLoading(true);
-    try {
-      if (action === 'signIn') {
-        await signInWithEmailAndPassword(auth, email, password);
-      } else {
-        await createUserWithEmailAndPassword(auth, email, password);
-      }
-      // The onAuthStateChanged listener in the provider will handle the redirect
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Authentication Error',
-        description: error.message,
-      });
-    } finally {
-      setLoading(false);
+    if (action === 'signIn') {
+      initiateEmailSignIn(auth, email, password);
+    } else {
+      initiateEmailSignUp(auth, email, password);
     }
+    // Redirect immediately. The onAuthStateChanged listener will handle auth state.
+    router.push('/');
   };
 
   return (
