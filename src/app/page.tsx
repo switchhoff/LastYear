@@ -18,6 +18,7 @@ import {
   Pencil,
   Save,
   Lock,
+  Eye,
 } from 'lucide-react';
 import {
   Dialog,
@@ -47,7 +48,6 @@ import {
 import { useUser, useAuth, useMemoFirebase, useDoc, useFirestore, useCollection } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
 import { Calendar } from '@/components/ui/calendar';
-import { Eye } from 'lucide-react';
 
 
 type DailyContent = {
@@ -257,7 +257,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
         displayDate.setHours(0,0,0,0);
 
         if (displayDate <= today) {
-            const sentence = (memory.userSentences && Object.values(memory.userSentences)[0]) || "No sentence found.";
+            const sentence = (memory.userSentences && Object.values(memory.userSentences)[0]) || memory.sentence || "No sentence found.";
             
             combinedEntries.push({
                 date: memoryDate,
@@ -381,7 +381,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     if (memoryData.userSentences && Object.keys(memoryData.userSentences).length > 0) {
       return Object.values(memoryData.userSentences)[0];
     }
-    return null;
+    return memoryData.sentence || null;
   }, [memoryData]);
 
 
@@ -550,17 +550,17 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-background text-foreground">
        <div className="absolute top-6 left-6 flex items-center gap-2">
-         {mode === 'add' ? (
+          {mode === 'add' && (
            <Button variant="ghost" size="icon" className="h-12 w-12" onClick={handleExitAddMode}>
              <Eye className="h-8 w-8" />
              <span className="sr-only">View Memory</span>
            </Button>
-         ) : (
+          )}
           <Dialog open={isAddMemoryDialogOpen} onOpenChange={setIsAddMemoryDialogOpen}>
             <DialogTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-12 w-12" >
                     <Pencil className="h-7 w-7" />
-                    <span className="sr-only">Add Memory</span>
+                    <span className="sr-only">Add or Edit Memory</span>
                 </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
@@ -577,7 +577,6 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
                 />
             </DialogContent>
           </Dialog>
-         )}
       </div>
 
       <div className="absolute top-6 right-6 flex items-center gap-2">
@@ -666,15 +665,16 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
               showContent && 'animate-fade-in'
             )}
           >
-            <div className="flex flex-col gap-2 mb-24 items-center">
+             <div className="flex flex-col gap-2 mb-24 items-center">
               {isViewingHistorical && (
-                 <Button
-                  variant="ghost"
-                  onClick={fetchTodaysContent}
-                  className="mb-2"
-                >
-                  Back to today...
-                </Button>
+                <div className="absolute top-[calc(50%-10rem)]">
+                   <Button
+                    variant="ghost"
+                    onClick={fetchTodaysContent}
+                  >
+                    Back to today...
+                  </Button>
+                </div>
               )}
               <div className="flex items-center justify-center gap-2">
                 <p className="text-md md:text-lg text-foreground/80">
