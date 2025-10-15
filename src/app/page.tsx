@@ -19,6 +19,7 @@ import {
   Save,
   Lock,
   Eye,
+  ArrowLeft,
 } from 'lucide-react';
 import {
   Dialog,
@@ -369,8 +370,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
 
 
   const reactions = useMemo(() => memoryData?.reactions || [], [memoryData]);
-  const userReaction = useMemo(() => {
-    return reactions.find((r) => r.userId === user?.uid)?.reaction || null;
+  const userReaction = useMemo(() to return reactions.find((r) => r.userId === user?.uid)?.reaction || null;
   }, [reactions, user?.uid]);
 
   const alexReaction = useMemo(() => memoryData?.reactions.find(r => r.userId === ALEX_USER_ID)?.reaction, [memoryData]);
@@ -552,8 +552,8 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
        <div className="absolute top-6 left-6 flex items-center gap-2">
           {mode === 'add' && (
            <Button variant="ghost" size="icon" className="h-12 w-12" onClick={handleExitAddMode}>
-             <Eye className="h-8 w-8" />
-             <span className="sr-only">View Memory</span>
+             <ArrowLeft className="h-8 w-8" />
+             <span className="sr-only">Back</span>
            </Button>
           )}
           <Dialog open={isAddMemoryDialogOpen} onOpenChange={setIsAddMemoryDialogOpen}>
@@ -810,3 +810,5 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     </main>
   );
 }
+
+    
