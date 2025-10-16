@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -370,8 +371,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
 
 
   const reactions = useMemo(() => memoryData?.reactions || [], [memoryData]);
-  const userReaction = useMemo(() to return reactions.find((r) => r.userId === user?.uid)?.reaction || null;
-  }, [reactions, user?.uid]);
+  const userReaction = useMemo(() => reactions.find((r) => r.userId === user?.uid)?.reaction || null, [reactions, user?.uid]);
 
   const alexReaction = useMemo(() => memoryData?.reactions.find(r => r.userId === ALEX_USER_ID)?.reaction, [memoryData]);
   const amalieReaction = useMemo(() => memoryData?.reactions.find(r => r.userId === AMALIE_USER_ID)?.reaction, [memoryData]);
@@ -550,12 +550,12 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-background text-foreground">
        <div className="absolute top-6 left-6 flex items-center gap-2">
-          {mode === 'add' && (
+          {mode === 'add' ? (
            <Button variant="ghost" size="icon" className="h-12 w-12" onClick={handleExitAddMode}>
              <ArrowLeft className="h-8 w-8" />
              <span className="sr-only">Back</span>
            </Button>
-          )}
+          ): null}
           <Dialog open={isAddMemoryDialogOpen} onOpenChange={setIsAddMemoryDialogOpen}>
             <DialogTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-12 w-12" >
@@ -810,5 +810,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     </main>
   );
 }
+
+    
 
     
