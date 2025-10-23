@@ -8,7 +8,6 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   History,
-  EyeOff,
   Send,
   LogOut,
   MessageSquare,
@@ -18,7 +17,6 @@ import {
   Save,
   Lock,
   ArrowLeft,
-  Eye,
 } from 'lucide-react';
 import {
   Dialog,
@@ -48,7 +46,7 @@ import {
 import { useUser, useAuth, useMemoFirebase, useDoc, useFirestore, useCollection } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
 import { Calendar } from '@/components/ui/calendar';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from '@/components/ui/carousel';
 
 
 type DailyContent = {
@@ -169,54 +167,53 @@ function ChatSection({ content, memoryData }: { content: DailyContent, memoryDat
   };
 
   return (
-    <div className="w-full max-w-2xl mt-8">
-      <div className="flex flex-col h-[350px] bg-muted/50 rounded-lg p-4">
-        <ScrollArea className="flex-grow mb-4 pr-4" ref={scrollAreaRef}>
-          <div className="flex flex-col gap-4">
-            {messages?.map((msg, index) => {
-              const isCurrentUser = msg.userId === user?.uid;
-              const isAlex = msg.userId === ALEX_USER_ID;
-              const isAmalie = msg.userId === AMALIE_USER_ID;
+    <div className="w-full h-full flex flex-col p-2">
+      <ScrollArea className="flex-grow mb-2 pr-4" ref={scrollAreaRef}>
+        <div className="flex flex-col gap-3">
+          {messages?.map((msg, index) => {
+            const isCurrentUser = msg.userId === user?.uid;
+            const isAlex = msg.userId === ALEX_USER_ID;
+            const isAmalie = msg.userId === AMALIE_USER_ID;
 
-              return (
-                <div
-                  key={index}
-                  className={cn(
-                    'flex flex-col max-w-[75%] p-2 px-3 rounded-lg',
-                    isCurrentUser
-                      ? 'self-end items-end'
-                      : 'self-start items-start',
-                    isAlex && !isCurrentUser && 'bg-yellow-200 text-black',
-                    isAmalie && !isCurrentUser && 'bg-pink-200 text-black',
-                    isCurrentUser && 'bg-primary text-primary-foreground',
-                    !isCurrentUser && !isAlex && !isAmalie && 'bg-background'
-                  )}
-                >
-                  <span className="text-xs text-muted-foreground">{msg.userName}</span>
-                  <p>{msg.text}</p>
-                </div>
-              );
-            })}
-          </div>
-        </ScrollArea>
-        <div className="flex items-center gap-2">
-          <Textarea
-            placeholder="Your thoughts on this memory..."
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            className="bg-background"
-            disabled={isSending || !user}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage();
-              }
-            }}
-          />
-          <Button onClick={handleSendMessage} disabled={isSending || !user}>
-            {isSending ? <LoadingSpinner /> : <Send />}
-          </Button>
+            return (
+              <div
+                key={index}
+                className={cn(
+                  'flex flex-col max-w-[75%] p-2 px-3 rounded-lg',
+                  isCurrentUser
+                    ? 'self-end items-end'
+                    : 'self-start items-start',
+                  isAlex && !isCurrentUser && 'bg-yellow-200 text-black',
+                  isAmalie && !isCurrentUser && 'bg-pink-200 text-black',
+                  isCurrentUser && 'bg-primary text-primary-foreground',
+                  !isCurrentUser && !isAlex && !isAmalie && 'bg-muted'
+                )}
+              >
+                <span className="text-xs text-muted-foreground">{msg.userName}</span>
+                <p className="text-sm">{msg.text}</p>
+              </div>
+            );
+          })}
         </div>
+      </ScrollArea>
+      <div className="flex items-center gap-2">
+        <Textarea
+          placeholder="Your thoughts..."
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          className="bg-background text-sm"
+          rows={1}
+          disabled={isSending || !user}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleSendMessage();
+            }
+          }}
+        />
+        <Button onClick={handleSendMessage} disabled={isSending || !user} size="icon" className="h-9 w-9">
+          {isSending ? <LoadingSpinner /> : <Send className="h-4 w-4"/>}
+        </Button>
       </div>
     </div>
   );
@@ -315,22 +312,16 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   const [selectedDateForEditing, setSelectedDateForEditing] = useState<Date | undefined>(undefined);
   const [spoilerAlert, setSpoilerAlert] = useState(true);
   const [isViewingHistorical, setIsViewingHistorical] = useState(false);
-  const [showFeedback, setShowFeedback] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const [mode, setMode] = useState<MainContentMode>('view');
   const [newUserSentence, setNewUserSentence] = useState('');
-  
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>()
+  const [activeSlide, setActiveSlide] = useState(0);
+
   const { toast } = useToast();
   const { user } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
-  const isMobile = useIsMobile();
-
-  useEffect(() => {
-    // Hide feedback by default on mobile
-    if (isMobile) {
-      setShowFeedback(false);
-    }
-  }, [isMobile]);
 
   const [isSending, setIsSending] = useState(false);
   const [displayedEmojis, setDisplayedEmojis] = useState<string[]>([]);
@@ -383,6 +374,20 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     }
     return null;
   }, [memoryData]);
+
+  useEffect(() => {
+    if (!carouselApi) {
+      return
+    }
+
+    const onSelect = () => {
+      setActiveSlide(carouselApi.selectedScrollSnap())
+    }
+    carouselApi.on('select', onSelect)
+    return () => {
+      carouselApi.off('select', onSelect);
+    };
+  }, [carouselApi])
 
 
   const generateEmojis = useCallback((currentReaction: string | null, preserveSpot: boolean = false) => {
@@ -535,6 +540,11 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     setSelectedDateForEditing(undefined);
     setNewUserSentence('');
   }
+  
+  const handleToggleChat = () => {
+    const targetSlide = activeSlide === 0 ? 1 : 0;
+    carouselApi?.scrollTo(targetSlide);
+  }
 
   const isEditingDateToday = useMemo(() => {
       if (!selectedDateForEditing) return false;
@@ -548,111 +558,102 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   const showLockForPastMemory = mode === 'add' && !!userSentenceForEditingDate && !isEditingDateToday;
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-4 md:p-8 text-center bg-background text-foreground pt-20 md:pt-8">
-       <div className="absolute top-4 left-4 md:top-6 md:left-6 flex items-center gap-2 z-10">
-          {mode === 'add' && (
-           <Button variant="ghost" size="icon" className="h-10 w-10 md:h-12 md:w-12" onClick={handleExitAddMode}>
-             <ArrowLeft className="h-6 w-6 md:h-8 md:w-8" />
-             <span className="sr-only">Back</span>
-           </Button>
+    <main className="flex h-screen flex-col items-center bg-background text-foreground overflow-hidden">
+      <div className="flex-shrink-0 w-full p-2 flex items-center justify-around z-10">
+          {mode === 'add' ? (
+             <Button variant="ghost" size="icon" className="h-10 w-10" onClick={handleExitAddMode}>
+                <ArrowLeft className="h-6 w-6" />
+                <span className="sr-only">Back</span>
+             </Button>
+          ) : (
+            <Dialog open={isAddMemoryDialogOpen} onOpenChange={setIsAddMemoryDialogOpen}>
+              <DialogTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-10 w-10">
+                      <Pencil className="h-5 w-5" />
+                      <span className="sr-only">Add or Edit Memory</span>
+                  </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                      <DialogTitle>Add or Edit a Memory</DialogTitle>
+                  </DialogHeader>
+                  <p className="text-muted-foreground text-sm">Select a date to write your memory for that day. You can go back as far as September 23, 2024.</p>
+                  <Calendar
+                      mode="single"
+                      selected={selectedDateForEditing}
+                      onSelect={handleDateSelectForEditing}
+                      disabled={{ before: new Date('2024-09-23'), after: new Date() }}
+                      initialFocus
+                  />
+              </DialogContent>
+            </Dialog>
           )}
-          <Dialog open={isAddMemoryDialogOpen} onOpenChange={setIsAddMemoryDialogOpen}>
+
+          <Dialog open={isHistoryDialogOpen} onOpenChange={setIsHistoryDialogOpen}>
             <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-10 w-10 md:h-12 md:w-12" >
-                    <Pencil className="h-5 w-5 md:h-7 md:w-7" />
-                    <span className="sr-only">Add or Edit Memory</span>
-                </Button>
+              <Button variant="ghost" size="icon" className="h-10 w-10">
+                <History className="h-6 w-6" />
+                <span className="sr-only">View History</span>
+              </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Add or Edit a Memory</DialogTitle>
-                </DialogHeader>
-                <p className="text-muted-foreground text-sm">Select a date to write your memory for that day. You can go back as far as September 23, 2024.</p>
-                <Calendar
-                    mode="single"
-                    selected={selectedDateForEditing}
-                    onSelect={handleDateSelectForEditing}
-                    disabled={{ before: new Date('2024-09-23'), after: new Date() }}
-                    initialFocus
-                />
+            <DialogContent className="h-screen w-screen max-w-full flex flex-col">
+              <DialogHeader>
+                <DialogTitle>Historical Memories</DialogTitle>
+              </DialogHeader>
+              <div className="flex items-center space-x-4 px-1 py-4">
+                <div className='flex items-center space-x-2'>
+                  <Switch
+                    id="spoiler-alert"
+                    checked={spoilerAlert}
+                    onCheckedChange={setSpoilerAlert}
+                  />
+                  <Label htmlFor="spoiler-alert">Spoiler Alert</Label>
+                </div>
+                <Button variant="outline" onClick={handleRandomSelect}>Random</Button>
+              </div>
+              <div className="relative flex-grow">
+                <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm">
+                  <div className="grid grid-cols-4 items-center gap-4 p-2 font-semibold text-muted-foreground border-b">
+                    <div className="col-span-1">Date</div>
+                    <div className="text-center col-span-1">Alex</div>
+                    <div className="text-center col-span-1">Amalie</div>
+                    <div className="col-span-1"></div>
+                  </div>
+                </div>
+                <ScrollArea className="h-[calc(100vh-200px)]">
+                  <div className="mt-2 flex flex-col gap-1 pr-4">
+                    {historicalSentences.length > 0 ? (
+                      historicalSentences.map((entry) => (
+                        <HistoricalEntry
+                          key={entry.date.toISOString()}
+                          entry={entry}
+                          onSelect={handleHistoricalSelect}
+                          showSentence={!spoilerAlert}
+                        />
+                      ))
+                    ) : (
+                      <p className="text-muted-foreground text-center pt-8">
+                        No memories found.
+                      </p>
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
             </DialogContent>
           </Dialog>
+
+          <Button variant="ghost" size="icon" className="h-10 w-10" onClick={handleToggleChat}>
+            <MessageSquare className="h-6 w-6" />
+            <span className="sr-only">Toggle Chat</span>
+          </Button>
+
+          <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => auth.signOut()}>
+            <LogOut className="h-5 w-5" />
+            <span className="sr-only">Log Out</span>
+          </Button>
       </div>
 
-      <div className="sticky top-0 md:absolute md:top-4 md:right-4 z-20 bg-background/80 backdrop-blur-sm md:bg-transparent md:backdrop-blur-none w-full md:w-auto p-2 md:p-0 flex items-center justify-end gap-2">
-        <Dialog open={isHistoryDialogOpen} onOpenChange={setIsHistoryDialogOpen}>
-          <DialogTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-10 w-10 md:h-12 md:w-12"
-            >
-              <History className="h-6 w-6 md:h-8 md:w-8" />
-              <span className="sr-only">View History</span>
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="h-screen w-screen max-w-full flex flex-col">
-            <DialogHeader>
-              <DialogTitle>Historical Memories</DialogTitle>
-            </DialogHeader>
-            <div className="flex items-center space-x-4 px-1 py-4">
-              <div className='flex items-center space-x-2'>
-                <Switch
-                  id="spoiler-alert"
-                  checked={spoilerAlert}
-                  onCheckedChange={setSpoilerAlert}
-                />
-                <Label htmlFor="spoiler-alert">Spoiler Alert</Label>
-              </div>
-              <Button variant="outline" onClick={handleRandomSelect}>Random</Button>
-            </div>
-            <div className="relative flex-grow">
-              <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm">
-                <div className="grid grid-cols-4 items-center gap-4 p-2 font-semibold text-muted-foreground border-b">
-                  <div className="col-span-1">Date</div>
-                  <div className="text-center col-span-1">Alex</div>
-                  <div className="text-center col-span-1">Amalie</div>
-                  <div className="col-span-1"></div>
-                </div>
-              </div>
-              <ScrollArea className="h-[calc(100vh-200px)]">
-                <div className="mt-2 flex flex-col gap-1 pr-4">
-                  {historicalSentences.length > 0 ? (
-                    historicalSentences.map((entry) => (
-                      <HistoricalEntry
-                        key={entry.date.toISOString()}
-                        entry={entry}
-                        onSelect={handleHistoricalSelect}
-                        showSentence={!spoilerAlert}
-                      />
-                    ))
-                  ) : (
-                    <p className="text-muted-foreground text-center pt-8">
-                      No memories found.
-                    </p>
-                  )}
-                </div>
-              </ScrollArea>
-            </div>
-          </DialogContent>
-        </Dialog>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-10 w-10 md:h-12 md:w-12"
-          onClick={() => setShowFeedback(!showFeedback)}
-        >
-          {showFeedback ? <EyeOff className="h-6 w-6 md:h-8 md:w-8" /> : <MessageSquare className="h-6 w-6 md:h-8 md:w-8" />}
-          <span className="sr-only">
-            {showFeedback ? 'Hide feedback section' : 'Show feedback section'}
-          </span>
-        </Button>
-        <Button variant="ghost" size="icon" className="h-10 w-10 md:h-12 md:w-12" onClick={() => auth.signOut()}>
-          <LogOut className="h-5 w-5 md:h-6 md:w-6" />
-        </Button>
-      </div>
-
-      <div className="flex-grow flex flex-col items-center justify-center w-full">
+      <div className="flex-grow flex flex-col items-center justify-center w-full px-4 pb-4">
         {loading ? (
           <div className="flex flex-col items-center gap-4">
             <LoadingSpinner className="h-12 w-12 text-primary" />
@@ -661,23 +662,18 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
         ) : content && mode === 'view' ? (
           <div
             className={cn(
-              'flex flex-col items-center justify-center opacity-0 w-full',
+              'flex flex-col items-center justify-center opacity-0 w-full h-full',
               showContent && 'animate-fade-in'
             )}
           >
             {isViewingHistorical && (
-              <div className="mb-4">
-                  <Button
-                  variant="ghost"
-                  onClick={fetchTodaysContent}
-                >
+                <Button variant="ghost" onClick={fetchTodaysContent} className="mb-2">
                   Back to today...
                 </Button>
-              </div>
             )}
-            <div className="flex flex-col gap-2 mb-12 md:mb-24 items-center">
-              <div className="flex items-center justify-center gap-2">
-                <p className="text-md md:text-lg text-foreground/80">
+            <div className="flex flex-col gap-1 mb-4 items-center text-center">
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <p className="text-base text-foreground/80">
                   {content.dateString}
                 </p>
                 {content.memorableDate && (
@@ -686,101 +682,111 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
                   </Badge>
                 )}
               </div>
-              <h1 className="text-xl md:text-2xl font-bold text-foreground tracking-wider">
+              <h1 className="text-lg font-bold text-foreground tracking-wider">
                 One year ago today...
               </h1>
             </div>
             
-            <div className="relative bg-card border rounded-lg shadow-sm p-8 md:p-12 max-w-2xl min-h-[250px] flex items-center justify-center">
-                 <span className="absolute top-4 left-4 text-6xl text-primary/10 font-serif">“</span>
-                 <span className="absolute bottom-4 right-4 text-6xl text-primary/10 font-serif">”</span>
-                <div className="absolute top-0 right-0 -mt-4 -mr-2 flex gap-1 items-center">
-                    {alexReaction && <Badge className="text-lg p-1.5 bg-yellow-200 text-black shadow-md">{alexReaction}</Badge>}
-                    {amalieReaction && <Badge className="text-lg p-1.5 bg-pink-200 text-black shadow-md">{amalieReaction}</Badge>}
-                    <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-                      <PopoverTrigger asChild>
-                         <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8 rounded-full bg-background hover:bg-muted"
-                          disabled={isSending || !user}
-                        >
-                          <PlusCircle className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-2">
-                        <div className="flex justify-center items-center gap-2">
-                          {displayedEmojis.map((emoji) => (
-                            <Button
-                              key={emoji}
-                              variant={userReaction === emoji ? 'default' : 'outline'}
-                              size="icon"
-                              className="text-2xl rounded-full h-12 w-12"
-                              onClick={() => handleReact(emoji)}
-                              disabled={isSending}
-                            >
-                              {emoji}
-                            </Button>
-                          ))}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-12 w-12 rounded-full"
-                            onClick={handleRefreshEmojis}
-                            disabled={isSending}
-                          >
-                            <RefreshCcw className="h-5 w-5 text-muted-foreground" />
-                          </Button>
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                </div>
-                <blockquote className="relative">
-                  {effectiveSentence ? (
-                    <p className="text-xl md:text-3xl text-primary italic text-balance">
-                      {effectiveSentence}
-                    </p>
-                  ) : (
-                    <p className="text-lg text-muted-foreground">No memory recorded for one year ago today.</p>
-                  )}
-                </blockquote>
-            </div>
+            <Carousel setApi={setCarouselApi} className="w-full flex-grow h-full">
+              <CarouselContent className="h-full">
+                <CarouselItem className="h-full">
+                  <div className="relative bg-card border rounded-lg shadow-sm p-6 w-full h-full flex items-center justify-center">
+                       <span className="absolute top-2 left-3 text-6xl text-primary/10 font-serif">“</span>
+                       <span className="absolute bottom-2 right-3 text-6xl text-primary/10 font-serif">”</span>
+                      <div className="absolute top-0 right-0 -mt-4 -mr-2 flex gap-1 items-center">
+                          {alexReaction && <Badge className="text-lg p-1.5 bg-yellow-200 text-black shadow-md">{alexReaction}</Badge>}
+                          {amalieReaction && <Badge className="text-lg p-1.5 bg-pink-200 text-black shadow-md">{amalieReaction}</Badge>}
+                          <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+                            <PopoverTrigger asChild>
+                               <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 rounded-full bg-background hover:bg-muted"
+                                disabled={isSending || !user}
+                              >
+                                <PlusCircle className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-2">
+                              <div className="flex justify-center items-center gap-2">
+                                {displayedEmojis.map((emoji) => (
+                                  <Button
+                                    key={emoji}
+                                    variant={userReaction === emoji ? 'default' : 'outline'}
+                                    size="icon"
+                                    className="text-xl rounded-full h-10 w-10"
+                                    onClick={() => handleReact(emoji)}
+                                    disabled={isSending}
+                                  >
+                                    {emoji}
+                                  </Button>
+                                ))}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-10 w-10 rounded-full"
+                                  onClick={handleRefreshEmojis}
+                                  disabled={isSending}
+                                >
+                                  <RefreshCcw className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                      </div>
+                      <blockquote className="relative text-center">
+                        {effectiveSentence ? (
+                          <p className="text-xl text-primary italic text-balance">
+                            {effectiveSentence}
+                          </p>
+                        ) : (
+                          <p className="text-base text-muted-foreground">No memory recorded for one year ago today.</p>
+                        )}
+                      </blockquote>
+                  </div>
+                </CarouselItem>
+                <CarouselItem className="h-full">
+                  <div className="bg-muted/50 rounded-lg w-full h-full">
+                    {memoryData && <ChatSection content={content} memoryData={memoryData} />}
+                  </div>
+                </CarouselItem>
+              </CarouselContent>
+            </Carousel>
 
-            {showFeedback && memoryData && <ChatSection content={content} memoryData={memoryData} />}
           </div>
         ) : content && mode === 'add' && selectedDateForEditing ? (
            <div className={cn(
-              'flex flex-col items-center justify-center opacity-0 w-full max-w-2xl',
+              'flex flex-col items-center justify-center opacity-0 w-full max-w-2xl h-full',
               showContent && 'animate-fade-in'
             )}>
-              <div className="flex flex-col gap-2 mb-8 w-full">
-                <p className="text-lg text-foreground/80 text-center">
+              <div className="flex flex-col gap-2 mb-4 w-full text-center">
+                <p className="text-lg text-foreground/80">
                   {selectedDateForEditing.toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' })}
                 </p>
-                <h1 className="text-2xl font-bold text-foreground tracking-wider text-center">
+                <h1 className="text-2xl font-bold text-foreground tracking-wider">
                   What's on your mind today?
                 </h1>
               </div>
 
               {showLockForPastMemory ? (
-                 <div className="flex flex-col items-center justify-center gap-4 text-muted-foreground border rounded-lg p-8 w-full min-h-[250px]">
+                 <div className="flex flex-col items-center justify-center gap-4 text-muted-foreground border rounded-lg p-8 w-full flex-grow">
                     <Lock className="h-10 w-10"/>
                     <p className="text-lg font-medium">You have already recorded this memory.</p>
                     <p className="text-sm">It will be revealed to you in a year!</p>
                  </div>
               ) : (
-                <>
+                <div className="w-full flex-grow flex flex-col">
                   <Textarea
                     value={newUserSentence}
                     onChange={(e) => setNewUserSentence(e.target.value)}
                     placeholder="Write your memory for this day..."
-                    className="w-full min-h-[200px] text-lg p-4"
+                    className="w-full flex-grow text-lg p-4"
                   />
                   <Button onClick={handleSaveSentence} disabled={isSending || !newUserSentence.trim()} className="mt-4">
                     {isSending ? <LoadingSpinner className="mr-2"/> : <Save className="mr-2"/>}
                     Save Memory
                   </Button>
-                </>
+                </div>
               )}
            </div>
         ) : (
