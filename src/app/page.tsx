@@ -28,7 +28,6 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { getAllSentences } from '@/lib/daily-content';
 import { getMemorableDate, type MemorableDate } from '@/lib/memorable-dates';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -255,8 +254,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
         displayDate.setHours(0,0,0,0);
 
         if (displayDate <= today) {
-            // Updated logic to handle both legacy and new sentence structures
-            const sentence = (memory.userSentences && Object.values(memory.userSentences)[0]) || (memory as any).sentence || "No sentence found.";
+            const sentence = (memory.userSentences && Object.values(memory.userSentences)[0]) || "No sentence found.";
             
             combinedEntries.push({
                 date: memoryDate,
@@ -382,8 +380,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     if (memoryData.userSentences && Object.keys(memoryData.userSentences).length > 0) {
       return Object.values(memoryData.userSentences)[0];
     }
-    // Fallback to the old sentence field
-    return (memoryData as any).sentence || null;
+    return null;
   }, [memoryData]);
 
 
@@ -667,17 +664,17 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
               showContent && 'animate-fade-in'
             )}
           >
+            {isViewingHistorical && (
+              <div className="mb-4">
+                  <Button
+                  variant="ghost"
+                  onClick={fetchTodaysContent}
+                >
+                  Back to today...
+                </Button>
+              </div>
+            )}
             <div className="flex flex-col gap-2 mb-12 md:mb-24 items-center">
-              {isViewingHistorical && (
-                <div className="absolute top-[calc(50%-12rem)] md:top-[calc(50%-10rem)]">
-                   <Button
-                    variant="ghost"
-                    onClick={fetchTodaysContent}
-                  >
-                    Back to today...
-                  </Button>
-                </div>
-              )}
               <div className="flex items-center justify-center gap-2">
                 <p className="text-md md:text-lg text-foreground/80">
                   {content.dateString}
