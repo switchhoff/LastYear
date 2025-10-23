@@ -327,7 +327,9 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
 
   useEffect(() => {
     // Hide feedback by default on mobile
-    setShowFeedback(!isMobile);
+    if (isMobile) {
+      setShowFeedback(false);
+    }
   }, [isMobile]);
 
   const [isSending, setIsSending] = useState(false);
@@ -376,7 +378,6 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   
   const effectiveSentence = useMemo(() => {
     if (!memoryData) return null;
-    // Check new userSentences map first
     if (memoryData.userSentences && Object.keys(memoryData.userSentences).length > 0) {
       return Object.values(memoryData.userSentences)[0];
     }
@@ -547,8 +548,8 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   const showLockForPastMemory = mode === 'add' && !!userSentenceForEditingDate && !isEditingDateToday;
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-8 text-center bg-background text-foreground">
-       <div className="absolute top-4 left-4 md:top-6 md:left-6 flex items-center gap-2">
+    <main className="flex min-h-screen flex-col items-center p-4 md:p-8 text-center bg-background text-foreground pt-20 md:pt-8">
+       <div className="absolute top-4 left-4 md:top-6 md:left-6 flex items-center gap-2 z-10">
           {mode === 'add' && (
            <Button variant="ghost" size="icon" className="h-10 w-10 md:h-12 md:w-12" onClick={handleExitAddMode}>
              <ArrowLeft className="h-6 w-6 md:h-8 md:w-8" />
@@ -578,7 +579,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
           </Dialog>
       </div>
 
-      <div className="absolute top-4 right-4 md:top-6 md:right-6 flex items-center gap-2">
+      <div className="sticky top-0 md:absolute md:top-4 md:right-4 z-20 bg-background/80 backdrop-blur-sm md:bg-transparent md:backdrop-blur-none w-full md:w-auto p-2 md:p-0 flex items-center justify-end gap-2">
         <Dialog open={isHistoryDialogOpen} onOpenChange={setIsHistoryDialogOpen}>
           <DialogTrigger asChild>
             <Button
