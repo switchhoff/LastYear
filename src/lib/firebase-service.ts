@@ -85,17 +85,16 @@ export function saveReaction(
       return;
     }
     
-    let reactions: UserReaction[] = memorySnap.data().reactions || [];
+    let currentReactions: UserReaction[] = memorySnap.data().reactions || [];
     
     // Remove previous reaction from the user
-    reactions = reactions.filter((r: UserReaction) => r.userId !== user.uid);
+    const otherUserReactions = currentReactions.filter((r: UserReaction) => r.userId !== user.uid);
     
-    // Add new reaction if one was provided
-    if (reaction) {
-      reactions.push({ userId: user.uid, reaction });
-    }
-
-    const dataToUpdate = { reactions };
+    const newReactions = reaction 
+      ? [...otherUserReactions, { userId: user.uid, reaction }]
+      : otherUserReactions;
+      
+    const dataToUpdate = { reactions: newReactions };
     updateDoc(memoryRef, dataToUpdate)
       .catch((error) => {
         const contextualError = new FirestorePermissionError({
