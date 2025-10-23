@@ -39,7 +39,7 @@ export const getMemoryDocId = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-export async function saveUserSentence(
+export function saveUserSentence(
   firestore: Firestore,
   user: User,
   date: Date,
@@ -51,26 +51,23 @@ export async function saveUserSentence(
   const memoryRef = doc(firestore, 'memories', memoryId);
 
   const dataToUpdate = {
-    userSentences: {
-      [user.uid]: sentence,
-    },
-    // Also ensure base fields are there if creating
+    [`userSentences.${user.uid}`]: sentence,
     id: memoryId,
     date: date.toISOString().split('T')[0],
   };
 
-  try {
-    // Use setDoc with merge to create/update without overwriting other users' sentences
-    await setDoc(memoryRef, dataToUpdate, { merge: true });
-  } catch (error) {
-    const contextualError = new FirestorePermissionError({
-      operation: 'write',
-      path: memoryRef.path,
-      requestResourceData: dataToUpdate,
-    });
-    errorEmitter.emit('permission-error', contextualError);
-  }
+  // Use non-blocking write with contextual error handling
+  setDoc(memoryRef, dataToUpdate, { merge: true })
+    .catch((error) => {
+      const contextualError = new FirestorePermissionError({
+        operation: 'write',
+        path: memoryRef.path,
+        requestResourceData: dataToUpdate
+      });
+      errorEmitter.emit('permission-error', contextualError);
+  });
 }
+
 
 export async function saveReaction(
   firestore: Firestore,
@@ -120,7 +117,7 @@ export async function addChatMessage(
   if (!user || !text.trim()) return;
 
   const memoryId = getMemoryDocId(new Date(memoryDate));
-  const memoryRef = doc(firestore, 'mememies', memoryId);
+  const memoryRef = doc(firestore, 'memories', memoryId);
 
   try {
     const userDocRef = doc(firestore, 'users', user.uid);
