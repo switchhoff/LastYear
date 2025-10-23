@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -46,6 +44,8 @@ import {
   type UserReaction,
   type Memory,
   type UserMemoryChatMessage,
+  ALEX_USER_ID,
+  AMALIE_USER_ID,
 } from '@/lib/firebase-service';
 import { useUser, useAuth, useMemoFirebase, useDoc, useFirestore, useCollection } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
@@ -67,9 +67,6 @@ type HistoricalEntryWithReactions = {
   reactions: UserReaction[]; 
   chatMessages: UserMemoryChatMessage[] 
 };
-
-const ALEX_USER_ID = '1xcBSDAluySuyeLwX5TEQnuiPMA2';
-const AMALIE_USER_ID = 'SFsKmCQM9NZi7Drmsb4pNBtLJ6m1';
 
 function HistoricalEntry({
   entry,
@@ -165,10 +162,10 @@ function ChatSection({ content, memoryData }: { content: DailyContent, memoryDat
     }
   }, [messages]);
 
-  const handleSendMessage = async () => {
+  const handleSendMessage = () => {
     if (!newMessage.trim() || !user || !firestore) return;
     setIsSending(true);
-    await addChatMessage(firestore, user, content.memoryDate, newMessage);
+    addChatMessage(firestore, user, content.memoryDate, newMessage);
     setNewMessage('');
     setIsSending(false);
   };
@@ -431,11 +428,11 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, userReaction]);
 
-  const handleReact = async (emoji: string) => {
+  const handleReact = (emoji: string) => {
     if (!user || !firestore || !content) return;
     setIsSending(true);
     const newEmoji = userReaction === emoji ? null : emoji;
-    await saveReaction(firestore, user, content.memoryDate, newEmoji);
+    saveReaction(firestore, user, content.memoryDate, newEmoji);
     setIsSending(false);
     setIsPopoverOpen(false);
   };
@@ -524,10 +521,10 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     }
   };
 
-  const handleSaveSentence = async () => {
+  const handleSaveSentence = () => {
     if (!user || !firestore || !newUserSentence.trim() || !selectedDateForEditing) return;
     setIsSending(true);
-    await saveUserSentence(firestore, user, selectedDateForEditing, newUserSentence);
+    saveUserSentence(firestore, user, selectedDateForEditing, newUserSentence);
     setIsSending(false);
     setMode('view');
     toast({ title: "Memory saved!" });

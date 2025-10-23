@@ -1,4 +1,3 @@
-
 import {
   doc,
   setDoc,
@@ -51,12 +50,13 @@ export function saveUserSentence(
   const memoryRef = doc(firestore, 'memories', memoryId);
 
   const dataToUpdate = {
-    [`userSentences.${user.uid}`]: sentence,
+    userSentences: {
+      [user.uid]: sentence,
+    },
     id: memoryId,
     date: date.toISOString().split('T')[0],
   };
 
-  // Use non-blocking write with contextual error handling
   setDoc(memoryRef, dataToUpdate, { merge: true })
     .catch((error) => {
       const contextualError = new FirestorePermissionError({
@@ -68,8 +68,7 @@ export function saveUserSentence(
   });
 }
 
-
-export async function saveReaction(
+export function saveReaction(
   firestore: Firestore,
   user: User,
   memoryDate: Date,
@@ -80,8 +79,7 @@ export async function saveReaction(
   const memoryId = getMemoryDocId(new Date(memoryDate));
   const memoryRef = doc(firestore, 'memories', memoryId);
 
-  try {
-    const memorySnap = await getDoc(memoryRef);
+  getDoc(memoryRef).then(memorySnap => {
     if (!memorySnap.exists()) {
       console.error("Attempted to react to a memory document that doesn't exist:", memoryId);
       return;
@@ -97,18 +95,26 @@ export async function saveReaction(
       reactions.push({ userId: user.uid, reaction });
     }
 
-    await updateDoc(memoryRef, { reactions });
-
-  } catch (error) {
-     const contextualError = new FirestorePermissionError({
-      operation: 'update',
-      path: memoryRef.path,
-    });
-    errorEmitter.emit('permission-error', contextualError);
-  }
+    const dataToUpdate = { reactions };
+    updateDoc(memoryRef, dataToUpdate)
+      .catch((error) => {
+        const contextualError = new FirestorePermissionError({
+          operation: 'update',
+          path: memoryRef.path,
+          requestResourceData: dataToUpdate,
+        });
+        errorEmitter.emit('permission-error', contextualError);
+      });
+  }).catch(error => {
+      const contextualError = new FirestorePermissionError({
+        operation: 'get',
+        path: memoryRef.path,
+      });
+      errorEmitter.emit('permission-error', contextualError);
+  });
 }
 
-export async function addChatMessage(
+export function addChatMessage(
   firestore: Firestore,
   user: User,
   memoryDate: Date,
@@ -118,10 +124,9 @@ export async function addChatMessage(
 
   const memoryId = getMemoryDocId(new Date(memoryDate));
   const memoryRef = doc(firestore, 'memories', memoryId);
+  const userDocRef = doc(firestore, 'users', user.uid);
 
-  try {
-    const userDocRef = doc(firestore, 'users', user.uid);
-    const userDocSnap = await getDoc(userDocRef);
+  getDoc(userDocRef).then(userDocSnap => {
     const userName = userDocSnap.exists() ? userDocSnap.data().userName : 'Anonymous';
 
     const newMessage: UserMemoryChatMessage = {
@@ -130,19 +135,26 @@ export async function addChatMessage(
       text: text,
     };
     
-    await updateDoc(memoryRef, {
+    const dataToUpdate = {
       chatMessages: arrayUnion(newMessage)
+    };
+
+    updateDoc(memoryRef, dataToUpdate)
+    .catch(error => {
+      const contextualError = new FirestorePermissionError({
+        operation: 'update',
+        path: memoryRef.path,
+        requestResourceData: { chatMessages: `arrayUnion(${JSON.stringify(newMessage)})`}
+      });
+      errorEmitter.emit('permission-error', contextualError);
     });
-    
-  } catch (error) {
-    console.error("Error adding chat message:", error);
-    const contextualError = new FirestorePermissionError({
-      operation: 'update',
-      path: memoryRef.path,
-      requestResourceData: { chatMessages: `arrayUnion({ userId: ${user.uid}, text: ${text} })`}
-    });
-    errorEmitter.emit('permission-error', contextualError);
-  }
+  }).catch(error => {
+      const contextualError = new FirestorePermissionError({
+        operation: 'get',
+        path: userDocRef.path,
+      });
+      errorEmitter.emit('permission-error', contextualError);
+  });
 }
 
 /**
@@ -177,4 +189,5 @@ export async function ensureMemoryDocuments(firestore: Firestore, allSentences: 
 
 
 // Hardcoded user IDs for legacy data.
-const ALEX_USER_ID = '1xcBSDAluySuyeLwX5TEQnuiPMA2';
+export const ALEX_USER_ID = '1xcBSDAluySuyeLwX5TEQnuiPMA2';
+export const AMALIE_USER_ID = 'SFsKmCQM9NZi7Drmsb4pNBtLJ6m1';
