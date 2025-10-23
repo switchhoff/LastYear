@@ -4,11 +4,9 @@ import {
   getDoc,
   updateDoc,
   arrayUnion,
-  writeBatch,
   type Firestore,
 } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
-import type { DatedSentence } from './daily-content';
 import { errorEmitter, FirestorePermissionError } from '@/firebase';
 
 export type UserReaction = {
@@ -55,7 +53,7 @@ export function saveUserSentence(
 
   updateDoc(memoryRef, dataToUpdate)
     .catch((error) => {
-        // If the doc doesn't exist, `updateDoc` fails. Try `setDoc` instead.
+        // If the doc doesn't exist, `updateDoc` fails. Try `setDoc` to create it.
         const createData = {
             id: memoryId,
             date: date.toISOString().split('T')[0],
@@ -167,38 +165,6 @@ export function addChatMessage(
       });
       errorEmitter.emit('permission-error', contextualError);
   });
-}
-
-/**
- * Ensures that a Firestore document exists for every sentence in daily-content.
- * This is idempotent and can be called safely on every app load.
- */
-export async function ensureMemoryDocuments(firestore: Firestore, allSentences: DatedSentence[]): Promise<void> {
-    try {
-        const batch = writeBatch(firestore);
-        
-        for (const sentence of allSentences) {
-            const memoryId = getMemoryDocId(sentence.date);
-            const memoryRef = doc(firestore, 'memories', memoryId);
-            
-            const newMemoryData = {
-                id: memoryId,
-                date: sentence.date.toISOString().split('T')[0],
-                userSentences: {
-                    [ALEX_USER_ID]: sentence.sentence,
-                },
-                reactions: [],
-                chatMessages: [],
-            };
-            // Use merge:true so we don't overwrite existing user sentences, reactions, or chats
-            // when this function runs on startup.
-            batch.set(memoryRef, newMemoryData, { merge: true });
-        }
-        
-        await batch.commit();
-    } catch (error) {
-        console.error("Error ensuring memory documents:", error);
-    }
 }
 
 

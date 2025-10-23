@@ -38,7 +38,6 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   saveReaction,
   addChatMessage,
-  ensureMemoryDocuments,
   saveUserSentence,
   getMemoryDocId,
   type UserReaction,
@@ -229,7 +228,6 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   const firestore = useFirestore();
   const router = useRouter();
   const [dataReady, setDataReady] = useState(false);
-  const allSentences = useMemo(() => getAllSentences(), []);
   
   const memoriesCollectionRef = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -281,15 +279,10 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   }, [user, isUserLoading, router]);
 
   useEffect(() => {
-    async function setupData() {
-        if (!user || !firestore) return;
-        await ensureMemoryDocuments(firestore, allSentences);
-        setDataReady(true);
-    }
     if (user && firestore) {
-      setupData();
+      setDataReady(true);
     }
-  }, [allSentences, user, firestore]);
+  }, [user, firestore]);
 
 
   if (isUserLoading || !user || !dataReady || memoriesLoading) {
