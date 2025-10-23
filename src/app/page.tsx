@@ -19,8 +19,8 @@ import {
   Pencil,
   Save,
   Lock,
-  Eye,
   ArrowLeft,
+  Eye,
 } from 'lucide-react';
 import {
   Dialog,
@@ -50,6 +50,7 @@ import {
 import { useUser, useAuth, useMemoFirebase, useDoc, useFirestore, useCollection } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
 import { Calendar } from '@/components/ui/calendar';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 
 type DailyContent = {
@@ -295,7 +296,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
 
   if (isUserLoading || !user || !dataReady || memoriesLoading) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-background text-foreground">
+      <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-8 text-center bg-background text-foreground">
         <LoadingSpinner className="h-12 w-12 text-primary" />
         <p className="text-muted-foreground mt-4">Loading user data and memories...</p>
       </main>
@@ -325,7 +326,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   const [selectedDateForEditing, setSelectedDateForEditing] = useState<Date | undefined>(undefined);
   const [spoilerAlert, setSpoilerAlert] = useState(true);
   const [isViewingHistorical, setIsViewingHistorical] = useState(false);
-  const [showFeedback, setShowFeedback] = useState(true);
+  const [showFeedback, setShowFeedback] = useState(false);
   const [mode, setMode] = useState<MainContentMode>('view');
   const [newUserSentence, setNewUserSentence] = useState('');
   
@@ -333,6 +334,11 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   const { user } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
+  const isMobile = useIsMobile();
+
+  useEffect(() => {
+    setShowFeedback(!isMobile);
+  }, [isMobile]);
 
   const [isSending, setIsSending] = useState(false);
   const [displayedEmojis, setDisplayedEmojis] = useState<string[]>([]);
@@ -371,16 +377,23 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
 
 
   const reactions = useMemo(() => memoryData?.reactions || [], [memoryData]);
-  const userReaction = useMemo(() => reactions.find((r) => r.userId === user?.uid)?.reaction || null, [reactions, user?.uid]);
+  const userReaction = useMemo(() => {
+    return reactions.find((r) => r.userId === user?.uid)?.reaction || null;
+   }, [reactions, user?.uid]);
 
   const alexReaction = useMemo(() => memoryData?.reactions.find(r => r.userId === ALEX_USER_ID)?.reaction, [memoryData]);
   const amalieReaction = useMemo(() => memoryData?.reactions.find(r => r.userId === AMALIE_USER_ID)?.reaction, [memoryData]);
   
   const effectiveSentence = useMemo(() => {
     if (!memoryData) return null;
+    // Check new userSentences map first
     if (memoryData.userSentences && Object.keys(memoryData.userSentences).length > 0) {
+      // This logic just gets the first sentence if multiple exist.
+      // You might want a more sophisticated way to display multiple sentences.
       return Object.values(memoryData.userSentences)[0];
     }
+    // Fallback to the old sentence field
+    // @ts-ignore - legacy field
     return memoryData.sentence || null;
   }, [memoryData]);
 
@@ -541,25 +554,25 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
       const today = new Date();
       today.setHours(0,0,0,0);
       const editingDate = new Date(selectedDateForEditing);
-      editingDate.setHours(0,0,0,0);
+editingDate.setHours(0,0,0,0);
       return today.getTime() === editingDate.getTime();
   }, [selectedDateForEditing]);
 
   const showLockForPastMemory = mode === 'add' && !!userSentenceForEditingDate && !isEditingDateToday;
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-background text-foreground">
-       <div className="absolute top-6 left-6 flex items-center gap-2">
+    <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-8 text-center bg-background text-foreground">
+       <div className="absolute top-4 left-4 md:top-6 md:left-6 flex items-center gap-2">
           {mode === 'add' ? (
-           <Button variant="ghost" size="icon" className="h-12 w-12" onClick={handleExitAddMode}>
-             <ArrowLeft className="h-8 w-8" />
+           <Button variant="ghost" size="icon" className="h-10 w-10 md:h-12 md:w-12" onClick={handleExitAddMode}>
+             <ArrowLeft className="h-6 w-6 md:h-8 md:w-8" />
              <span className="sr-only">Back</span>
            </Button>
           ): null}
           <Dialog open={isAddMemoryDialogOpen} onOpenChange={setIsAddMemoryDialogOpen}>
             <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-12 w-12" >
-                    <Pencil className="h-7 w-7" />
+                <Button variant="ghost" size="icon" className="h-10 w-10 md:h-12 md:w-12" >
+                    <Pencil className="h-5 w-5 md:h-7 md:w-7" />
                     <span className="sr-only">Add or Edit Memory</span>
                 </Button>
             </DialogTrigger>
@@ -579,17 +592,17 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
           </Dialog>
       </div>
 
-      <div className="absolute top-6 right-6 flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="h-12 w-12" onClick={() => auth.signOut()}>
-          <LogOut className="h-6 w-6" />
+      <div className="absolute top-4 right-4 md:top-6 md:right-6 flex items-center gap-2">
+        <Button variant="ghost" size="icon" className="h-10 w-10 md:h-12 md:w-12" onClick={() => auth.signOut()}>
+          <LogOut className="h-5 w-5 md:h-6 md:w-6" />
         </Button>
         <Button
           variant="ghost"
           size="icon"
-          className="h-12 w-12"
+          className="h-10 w-10 md:h-12 md:w-12"
           onClick={() => setShowFeedback(!showFeedback)}
         >
-          {showFeedback ? <EyeOff className="h-8 w-8" /> : <Eye className="h-8 w-8" />}
+          {showFeedback ? <EyeOff className="h-6 w-6 md:h-8 md:w-8" /> : <MessageSquare className="h-6 w-6 md:h-8 md:w-8" />}
           <span className="sr-only">
             {showFeedback ? 'Hide feedback section' : 'Show feedback section'}
           </span>
@@ -599,9 +612,9 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
             <Button
               variant="ghost"
               size="icon"
-              className="h-12 w-12"
+              className="h-10 w-10 md:h-12 md:w-12"
             >
-              <History className="h-8 w-8" />
+              <History className="h-6 w-6 md:h-8 md:w-8" />
               <span className="sr-only">View History</span>
             </Button>
           </DialogTrigger>
@@ -665,9 +678,9 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
               showContent && 'animate-fade-in'
             )}
           >
-             <div className="flex flex-col gap-2 mb-24 items-center">
+             <div className="flex flex-col gap-2 mb-12 md:mb-24 items-center">
               {isViewingHistorical && (
-                <div className="absolute top-[calc(50%-10rem)]">
+                <div className="absolute top-[calc(50%-12rem)] md:top-[calc(50%-10rem)]">
                    <Button
                     variant="ghost"
                     onClick={fetchTodaysContent}
@@ -691,7 +704,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
               </h1>
             </div>
             
-            <div className="relative bg-card border rounded-lg shadow-sm p-12 max-w-2xl min-h-[250px] flex items-center justify-center">
+            <div className="relative bg-card border rounded-lg shadow-sm p-8 md:p-12 max-w-2xl min-h-[250px] flex items-center justify-center">
                  <span className="absolute top-4 left-4 text-6xl text-primary/10 font-serif">“</span>
                  <span className="absolute bottom-4 right-4 text-6xl text-primary/10 font-serif">”</span>
                 <div className="absolute top-0 right-0 -mt-4 -mr-2 flex gap-1 items-center">
@@ -737,7 +750,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
                 </div>
                 <blockquote className="relative">
                   {effectiveSentence ? (
-                    <p className="text-2xl md:text-3xl text-primary italic text-balance">
+                    <p className="text-xl md:text-3xl text-primary italic text-balance">
                       {effectiveSentence}
                     </p>
                   ) : (
@@ -810,7 +823,3 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     </main>
   );
 }
-
-    
-
-    
