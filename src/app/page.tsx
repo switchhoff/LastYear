@@ -170,7 +170,7 @@ function ChatSection({ content, memoryData }: { content: DailyContent, memoryDat
 
   return (
     <div className="w-full max-w-2xl mt-8">
-      <div className="flex flex-col h-[400px] bg-muted/50 rounded-lg p-4">
+      <div className="flex flex-col h-[350px] bg-muted/50 rounded-lg p-4">
         <ScrollArea className="flex-grow mb-4 pr-4" ref={scrollAreaRef}>
           <div className="flex flex-col gap-4">
             {messages?.map((msg, index) => {
