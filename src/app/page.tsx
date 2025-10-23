@@ -579,20 +579,6 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
       </div>
 
       <div className="absolute top-4 right-4 md:top-6 md:right-6 flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="h-10 w-10 md:h-12 md:w-12" onClick={() => auth.signOut()}>
-          <LogOut className="h-5 w-5 md:h-6 md:w-6" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-10 w-10 md:h-12 md:w-12"
-          onClick={() => setShowFeedback(!showFeedback)}
-        >
-          {showFeedback ? <EyeOff className="h-6 w-6 md:h-8 md:w-8" /> : <MessageSquare className="h-6 w-6 md:h-8 md:w-8" />}
-          <span className="sr-only">
-            {showFeedback ? 'Hide feedback section' : 'Show feedback section'}
-          </span>
-        </Button>
         <Dialog open={isHistoryDialogOpen} onOpenChange={setIsHistoryDialogOpen}>
           <DialogTrigger asChild>
             <Button
@@ -649,6 +635,20 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
             </div>
           </DialogContent>
         </Dialog>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 md:h-12 md:w-12"
+          onClick={() => setShowFeedback(!showFeedback)}
+        >
+          {showFeedback ? <EyeOff className="h-6 w-6 md:h-8 md:w-8" /> : <MessageSquare className="h-6 w-6 md:h-8 md:w-8" />}
+          <span className="sr-only">
+            {showFeedback ? 'Hide feedback section' : 'Show feedback section'}
+          </span>
+        </Button>
+        <Button variant="ghost" size="icon" className="h-10 w-10 md:h-12 md:w-12" onClick={() => auth.signOut()}>
+          <LogOut className="h-5 w-5 md:h-6 md:w-6" />
+        </Button>
       </div>
 
       <div className="flex-grow flex flex-col items-center justify-center w-full">
