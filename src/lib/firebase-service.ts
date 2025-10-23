@@ -50,21 +50,30 @@ export function saveUserSentence(
   const memoryRef = doc(firestore, 'memories', memoryId);
 
   const dataToUpdate = {
-    userSentences: {
-      [user.uid]: sentence,
-    },
-    id: memoryId,
-    date: date.toISOString().split('T')[0],
+    [`userSentences.${user.uid}`]: sentence,
   };
 
-  setDoc(memoryRef, dataToUpdate, { merge: true })
+  updateDoc(memoryRef, dataToUpdate)
     .catch((error) => {
-      const contextualError = new FirestorePermissionError({
-        operation: 'write',
-        path: memoryRef.path,
-        requestResourceData: dataToUpdate
-      });
-      errorEmitter.emit('permission-error', contextualError);
+        // If the doc doesn't exist, `updateDoc` fails. Try `setDoc` instead.
+        const createData = {
+            id: memoryId,
+            date: date.toISOString().split('T')[0],
+            userSentences: {
+                [user.uid]: sentence,
+            },
+            reactions: [],
+            chatMessages: [],
+        }
+        setDoc(memoryRef, createData, { merge: true })
+            .catch(setError => {
+                 const contextualError = new FirestorePermissionError({
+                    operation: 'write',
+                    path: memoryRef.path,
+                    requestResourceData: createData
+                });
+                errorEmitter.emit('permission-error', contextualError);
+            })
   });
 }
 
@@ -85,7 +94,7 @@ export function saveReaction(
       return;
     }
     
-    let currentReactions: UserReaction[] = memorySnap.data().reactions || [];
+    const currentReactions: UserReaction[] = memorySnap.data().reactions || [];
     
     // Remove previous reaction from the user
     const otherUserReactions = currentReactions.filter((r: UserReaction) => r.userId !== user.uid);
@@ -95,6 +104,7 @@ export function saveReaction(
       : otherUserReactions;
       
     const dataToUpdate = { reactions: newReactions };
+
     updateDoc(memoryRef, dataToUpdate)
       .catch((error) => {
         const contextualError = new FirestorePermissionError({
@@ -125,8 +135,9 @@ export function addChatMessage(
   const memoryRef = doc(firestore, 'memories', memoryId);
   const userDocRef = doc(firestore, 'users', user.uid);
 
+  // We need the user's name for the chat message.
   getDoc(userDocRef).then(userDocSnap => {
-    const userName = userDocSnap.exists() ? userDocSnap.data().userName : 'Anonymous';
+    const userName = userDocSnap.exists() ? userDocSnap.data().userName : (user.displayName || 'Anonymous');
 
     const newMessage: UserMemoryChatMessage = {
       userId: user.uid,
@@ -143,11 +154,13 @@ export function addChatMessage(
       const contextualError = new FirestorePermissionError({
         operation: 'update',
         path: memoryRef.path,
+        // Represent arrayUnion as a string for the error message
         requestResourceData: { chatMessages: `arrayUnion(${JSON.stringify(newMessage)})`}
       });
       errorEmitter.emit('permission-error', contextualError);
     });
   }).catch(error => {
+      // This catch handles errors from getDoc(userDocRef)
       const contextualError = new FirestorePermissionError({
         operation: 'get',
         path: userDocRef.path,
@@ -177,6 +190,8 @@ export async function ensureMemoryDocuments(firestore: Firestore, allSentences: 
                 reactions: [],
                 chatMessages: [],
             };
+            // Use merge:true so we don't overwrite existing user sentences, reactions, or chats
+            // when this function runs on startup.
             batch.set(memoryRef, newMemoryData, { merge: true });
         }
         
