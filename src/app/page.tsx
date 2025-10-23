@@ -260,7 +260,8 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
         displayDate.setHours(0,0,0,0);
 
         if (displayDate <= today) {
-            const sentence = (memory.userSentences && Object.values(memory.userSentences)[0]) || memory.sentence || "No sentence found.";
+            // Updated logic to handle both legacy and new sentence structures
+            const sentence = (memory.userSentences && Object.values(memory.userSentences)[0]) || (memory as any).sentence || "No sentence found.";
             
             combinedEntries.push({
                 date: memoryDate,
@@ -337,6 +338,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   const isMobile = useIsMobile();
 
   useEffect(() => {
+    // Hide feedback by default on mobile
     setShowFeedback(!isMobile);
   }, [isMobile]);
 
@@ -379,7 +381,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   const reactions = useMemo(() => memoryData?.reactions || [], [memoryData]);
   const userReaction = useMemo(() => {
     return reactions.find((r) => r.userId === user?.uid)?.reaction || null;
-   }, [reactions, user?.uid]);
+  }, [reactions, user?.uid]);
 
   const alexReaction = useMemo(() => memoryData?.reactions.find(r => r.userId === ALEX_USER_ID)?.reaction, [memoryData]);
   const amalieReaction = useMemo(() => memoryData?.reactions.find(r => r.userId === AMALIE_USER_ID)?.reaction, [memoryData]);
@@ -388,13 +390,10 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     if (!memoryData) return null;
     // Check new userSentences map first
     if (memoryData.userSentences && Object.keys(memoryData.userSentences).length > 0) {
-      // This logic just gets the first sentence if multiple exist.
-      // You might want a more sophisticated way to display multiple sentences.
       return Object.values(memoryData.userSentences)[0];
     }
     // Fallback to the old sentence field
-    // @ts-ignore - legacy field
-    return memoryData.sentence || null;
+    return (memoryData as any).sentence || null;
   }, [memoryData]);
 
 
@@ -554,7 +553,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
       const today = new Date();
       today.setHours(0,0,0,0);
       const editingDate = new Date(selectedDateForEditing);
-editingDate.setHours(0,0,0,0);
+      editingDate.setHours(0,0,0,0);
       return today.getTime() === editingDate.getTime();
   }, [selectedDateForEditing]);
 
@@ -563,12 +562,12 @@ editingDate.setHours(0,0,0,0);
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-8 text-center bg-background text-foreground">
        <div className="absolute top-4 left-4 md:top-6 md:left-6 flex items-center gap-2">
-          {mode === 'add' ? (
+          {mode === 'add' && (
            <Button variant="ghost" size="icon" className="h-10 w-10 md:h-12 md:w-12" onClick={handleExitAddMode}>
              <ArrowLeft className="h-6 w-6 md:h-8 md:w-8" />
              <span className="sr-only">Back</span>
            </Button>
-          ): null}
+          )}
           <Dialog open={isAddMemoryDialogOpen} onOpenChange={setIsAddMemoryDialogOpen}>
             <DialogTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-10 w-10 md:h-12 md:w-12" >
@@ -678,7 +677,7 @@ editingDate.setHours(0,0,0,0);
               showContent && 'animate-fade-in'
             )}
           >
-             <div className="flex flex-col gap-2 mb-12 md:mb-24 items-center">
+            <div className="flex flex-col gap-2 mb-12 md:mb-24 items-center">
               {isViewingHistorical && (
                 <div className="absolute top-[calc(50%-12rem)] md:top-[calc(50%-10rem)]">
                    <Button
