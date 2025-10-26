@@ -4,6 +4,8 @@ import {
   getDoc,
   updateDoc,
   arrayUnion,
+  serverTimestamp,
+  FieldValue,
   type Firestore,
 } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
@@ -18,6 +20,7 @@ export type UserMemoryChatMessage = {
   userId: string;
   userName: string;
   text: string;
+  timestamp: FieldValue;
 };
 
 export type Memory = {
@@ -26,6 +29,7 @@ export type Memory = {
     userSentences: { [key: string]: string };
     reactions: UserReaction[];
     chatMessages?: UserMemoryChatMessage[];
+    lastRead?: { [key: string]: FieldValue };
 }
 
 export const getMemoryDocId = (date: Date): string => {
@@ -51,9 +55,20 @@ export function saveUserSentence(
     [`userSentences.${user.uid}`]: sentence,
   };
 
-  updateDoc(memoryRef, dataToUpdate)
-    .catch((error) => {
-        // If the doc doesn't exist, `updateDoc` fails. Try `setDoc` to create it.
+  getDoc(memoryRef).then(docSnap => {
+    if (docSnap.exists()) {
+        // Document exists, just update the sentence
+        updateDoc(memoryRef, dataToUpdate)
+        .catch((error) => {
+             const contextualError = new FirestorePermissionError({
+                operation: 'update',
+                path: memoryRef.path,
+                requestResourceData: dataToUpdate
+            });
+            errorEmitter.emit('permission-error', contextualError);
+        });
+    } else {
+        // Document doesn't exist, create it with all fields
         const createData = {
             id: memoryId,
             date: date.toISOString().split('T')[0],
@@ -62,16 +77,24 @@ export function saveUserSentence(
             },
             reactions: [],
             chatMessages: [],
+            lastRead: {},
         }
-        setDoc(memoryRef, createData, { merge: true })
+        setDoc(memoryRef, createData)
             .catch(setError => {
                  const contextualError = new FirestorePermissionError({
-                    operation: 'write',
+                    operation: 'create',
                     path: memoryRef.path,
                     requestResourceData: createData
                 });
                 errorEmitter.emit('permission-error', contextualError);
             })
+    }
+  }).catch(error => {
+     const contextualError = new FirestorePermissionError({
+        operation: 'get',
+        path: memoryRef.path,
+    });
+    errorEmitter.emit('permission-error', contextualError);
   });
 }
 
@@ -94,7 +117,6 @@ export function saveReaction(
     
     const currentReactions: UserReaction[] = memorySnap.data().reactions || [];
     
-    // Remove previous reaction from the user
     const otherUserReactions = currentReactions.filter((r: UserReaction) => r.userId !== user.uid);
     
     const newReactions = reaction 
@@ -133,7 +155,6 @@ export function addChatMessage(
   const memoryRef = doc(firestore, 'memories', memoryId);
   const userDocRef = doc(firestore, 'users', user.uid);
 
-  // We need the user's name for the chat message.
   getDoc(userDocRef).then(userDocSnap => {
     const userName = userDocSnap.exists() ? userDocSnap.data().userName : (user.displayName || 'Anonymous');
 
@@ -141,6 +162,7 @@ export function addChatMessage(
       userId: user.uid,
       userName: userName,
       text: text,
+      timestamp: serverTimestamp(),
     };
     
     const dataToUpdate = {
@@ -152,18 +174,35 @@ export function addChatMessage(
       const contextualError = new FirestorePermissionError({
         operation: 'update',
         path: memoryRef.path,
-        // Represent arrayUnion as a string for the error message
         requestResourceData: { chatMessages: `arrayUnion(${JSON.stringify(newMessage)})`}
       });
       errorEmitter.emit('permission-error', contextualError);
     });
   }).catch(error => {
-      // This catch handles errors from getDoc(userDocRef)
       const contextualError = new FirestorePermissionError({
         operation: 'get',
         path: userDocRef.path,
       });
       errorEmitter.emit('permission-error', contextualError);
+  });
+}
+
+export function markChatAsRead(firestore: Firestore, user: User, memoryDate: Date) {
+  if (!user) return;
+  const memoryId = getMemoryDocId(new Date(memoryDate));
+  const memoryRef = doc(firestore, 'memories', memoryId);
+
+  const dataToUpdate = {
+    [`lastRead.${user.uid}`]: serverTimestamp(),
+  };
+
+  updateDoc(memoryRef, dataToUpdate).catch((error) => {
+    const contextualError = new FirestorePermissionError({
+      operation: 'update',
+      path: memoryRef.path,
+      requestResourceData: dataToUpdate,
+    });
+    errorEmitter.emit('permission-error', contextualError);
   });
 }
 

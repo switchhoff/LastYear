@@ -37,6 +37,7 @@ import {
   addChatMessage,
   saveUserSentence,
   getMemoryDocId,
+  markChatAsRead,
   type UserReaction,
   type Memory,
   type UserMemoryChatMessage,
@@ -44,7 +45,7 @@ import {
   AMALIE_USER_ID,
 } from '@/lib/firebase-service';
 import { useUser, useAuth, useMemoFirebase, useDoc, useFirestore, useCollection } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { collection, doc, Timestamp } from 'firebase/firestore';
 import { Calendar } from '@/components/ui/calendar';
 import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from '@/components/ui/carousel';
 
@@ -61,7 +62,8 @@ type HistoricalEntryWithReactions = {
   date: Date,
   sentence: string,
   reactions: UserReaction[]; 
-  chatMessages: UserMemoryChatMessage[] 
+  chatMessages: UserMemoryChatMessage[];
+  unreadCount: number;
 };
 
 function HistoricalEntry({
@@ -75,7 +77,6 @@ function HistoricalEntry({
 }) {
   const alexReaction = useMemo(() => entry.reactions.find(r => r.userId === ALEX_USER_ID)?.reaction, [entry.reactions]);
   const amalieReaction = useMemo(() => entry.reactions.find(r => r.userId === AMALIE_USER_ID)?.reaction, [entry.reactions]);
-  const chatCount = entry.chatMessages?.length || 0;
 
   const displayDate = new Date(entry.date);
   displayDate.setFullYear(displayDate.getFullYear() + 1);
@@ -113,13 +114,16 @@ function HistoricalEntry({
         {amalieReaction || <span className="text-muted-foreground/50">-</span>}
       </div>
        <div className="col-span-1 flex justify-center">
-        {chatCount > 0 && (
+        {entry.unreadCount > 0 && (
           <div className="relative">
-            <MessageSquare className="h-6 w-6 text-muted-foreground" />
+            <MessageSquare className="h-6 w-6 text-primary" />
             <Badge variant="destructive" className="absolute -top-2 -right-3 px-1.5 h-5 min-w-[20px] flex items-center justify-center">
-              {chatCount > 9 ? '9+' : chatCount}
+              {entry.unreadCount > 9 ? '9+' : entry.unreadCount}
             </Badge>
           </div>
+        )}
+         {entry.unreadCount === 0 && entry.chatMessages.length > 0 && (
+            <MessageSquare className="h-6 w-6 text-muted-foreground" />
         )}
       </div>
     </div>
@@ -233,38 +237,37 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   const { data: memories, isLoading: memoriesLoading } = useCollection<Memory>(memoriesCollectionRef);
   
   const historicalSentences = useMemo((): HistoricalEntryWithReactions[] => {
-    if (!memories) return [];
+    if (!memories || !user) return [];
     
-    const memoriesMap = new Map(memories.map(m => [m.id, m]));
-    const combinedEntries: HistoricalEntryWithReactions[] = [];
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    memoriesMap.forEach((memory, id) => {
-        const dateParts = id.split('-').map(Number);
+    return memories.map(memory => {
+        const dateParts = memory.id.split('-').map(Number);
         const memoryDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
         memoryDate.setHours(0,0,0,0);
         
-        const displayDate = new Date(memoryDate);
-        displayDate.setFullYear(displayDate.getFullYear() + 1);
-        displayDate.setHours(0,0,0,0);
-
-        if (displayDate <= today) {
-            const sentence = (memory.userSentences && Object.values(memory.userSentences)[0]) || "No sentence found.";
-            
-            combinedEntries.push({
-                date: memoryDate,
-                sentence,
-                reactions: memory.reactions || [],
-                chatMessages: memory.chatMessages || [],
-            });
+        const sentence = (memory.userSentences && Object.values(memory.userSentences)[0]) || "No sentence found.";
+        
+        const lastReadTimestamp = memory.lastRead?.[user.uid] as Timestamp | undefined;
+        let unreadCount = 0;
+        if (memory.chatMessages) {
+            if (lastReadTimestamp) {
+                unreadCount = memory.chatMessages.filter(
+                    msg => msg.timestamp && (msg.timestamp as unknown as Timestamp).toMillis() > lastReadTimestamp.toMillis() && msg.userId !== user.uid
+                ).length;
+            } else {
+                unreadCount = memory.chatMessages.filter(msg => msg.userId !== user.uid).length;
+            }
         }
-    });
 
-    return combinedEntries.sort((a, b) => b.date.getTime() - a.date.getTime());
+        return {
+            date: memoryDate,
+            sentence,
+            reactions: memory.reactions || [],
+            chatMessages: memory.chatMessages || [],
+            unreadCount: unreadCount
+        };
+    }).sort((a, b) => b.date.getTime() - a.date.getTime());
 
-  }, [memories]);
+  }, [memories, user]);
 
 
   useEffect(() => {
@@ -312,7 +315,6 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   const [selectedDateForEditing, setSelectedDateForEditing] = useState<Date | undefined>(undefined);
   const [spoilerAlert, setSpoilerAlert] = useState(true);
   const [isViewingHistorical, setIsViewingHistorical] = useState(false);
-  const [showChat, setShowChat] = useState(false);
   const [mode, setMode] = useState<MainContentMode>('view');
   const [newUserSentence, setNewUserSentence] = useState('');
   const [carouselApi, setCarouselApi] = useState<CarouselApi>()
@@ -374,6 +376,18 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     }
     return null;
   }, [memoryData]);
+  
+  const unreadMessagesCount = useMemo(() => {
+      if (!memoryData || !user || !memoryData.chatMessages) return 0;
+      const lastReadTimestamp = memoryData.lastRead?.[user.uid] as Timestamp | undefined;
+      if (lastReadTimestamp) {
+        return memoryData.chatMessages.filter(
+          msg => msg.timestamp && (msg.timestamp as unknown as Timestamp).toMillis() > lastReadTimestamp.toMillis() && msg.userId !== user.uid
+        ).length;
+      }
+      return memoryData.chatMessages.filter(msg => msg.userId !== user.uid).length;
+  }, [memoryData, user]);
+
 
   useEffect(() => {
     if (!carouselApi) {
@@ -381,13 +395,18 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     }
 
     const onSelect = () => {
-      setActiveSlide(carouselApi.selectedScrollSnap())
+      const selectedSnap = carouselApi.selectedScrollSnap();
+      setActiveSlide(selectedSnap);
+      if (selectedSnap === 1 && user && firestore && content) {
+        // User swiped to chat view, mark as read.
+        markChatAsRead(firestore, user, content.memoryDate);
+      }
     }
     carouselApi.on('select', onSelect)
     return () => {
       carouselApi.off('select', onSelect);
     };
-  }, [carouselApi])
+  }, [carouselApi, user, firestore, content])
 
 
   const generateEmojis = useCallback((currentReaction: string | null, preserveSpot: boolean = false) => {
@@ -642,8 +661,13 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
             </DialogContent>
           </Dialog>
 
-          <Button variant="ghost" size="icon" className="h-10 w-10" onClick={handleToggleChat}>
+          <Button variant="ghost" size="icon" className="h-10 w-10 relative" onClick={handleToggleChat}>
             <MessageSquare className="h-6 w-6" />
+            {unreadMessagesCount > 0 && (
+                <Badge variant="destructive" className="absolute -top-1 -right-1 px-1.5 h-5 min-w-[20px] flex items-center justify-center">
+                    {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
+                </Badge>
+            )}
             <span className="sr-only">Toggle Chat</span>
           </Button>
 
@@ -667,7 +691,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
             )}
           >
             {isViewingHistorical && (
-                <Button variant="ghost" onClick={fetchTodaysContent} className="mb-2">
+                <Button variant="link" onClick={fetchTodaysContent} className="mb-2 h-auto p-0">
                   Back to today...
                 </Button>
             )}

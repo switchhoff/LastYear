@@ -52,6 +52,11 @@
           "items": {
             "$ref": "#/entities/UserMemoryChatMessage"
           }
+        },
+        "lastRead": {
+            "type": "object",
+            "description": "An object mapping user IDs to the timestamp of their last read.",
+            "properties": {}
         }
       },
       "required": ["id", "date"]
@@ -88,9 +93,14 @@
         "userName": {
           "type": "string",
           "description": "The name of the user who sent the message."
+        },
+        "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The server timestamp when the message was created."
         }
       },
-      "required": ["userId", "text", "userName"]
+      "required": ["userId", "text", "userName", "timestamp"]
     }
   },
   "auth": {
