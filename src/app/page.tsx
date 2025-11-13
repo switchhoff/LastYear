@@ -227,12 +227,12 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const router = useRouter();
-  const [dataReady, setDataReady] = useState(false);
   
   const memoriesCollectionRef = useMemoFirebase(() => {
-    if (!firestore) return null;
+    // Only fetch memories if the user is logged in
+    if (!firestore || !user) return null;
     return collection(firestore, 'memories');
-  }, [firestore]);
+  }, [firestore, user]);
 
   const { data: memories, isLoading: memoriesLoading } = useCollection<Memory>(memoriesCollectionRef);
   
@@ -276,14 +276,10 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     }
   }, [user, isUserLoading, router]);
 
-  useEffect(() => {
-    if (user && firestore) {
-      setDataReady(true);
-    }
-  }, [user, firestore]);
+  // Loading state should depend on auth check and, if authenticated, the memories fetch
+  const isLoading = isUserLoading || (user && memoriesLoading);
 
-
-  if (isUserLoading || !user || !dataReady || memoriesLoading) {
+  if (isLoading || !user) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-8 text-center bg-background text-foreground">
         <LoadingSpinner className="h-12 w-12 text-primary" />
@@ -578,7 +574,7 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
 
   return (
     <main className="flex h-screen flex-col items-center bg-background text-foreground overflow-hidden">
-      <div className="flex-shrink-0 w-full p-2 flex items-center justify-around z-10">
+      <div className="flex-shrink-0 w-full p-2 flex items-center justify-around z-10 sticky top-0 bg-background/95 backdrop-blur-sm">
           {mode === 'add' ? (
              <Button variant="ghost" size="icon" className="h-10 w-10" onClick={handleExitAddMode}>
                 <ArrowLeft className="h-6 w-6" />

@@ -59,7 +59,7 @@ service cloud.firestore {
      * @principle Allows open collaboration on shared memories.
      */
     match /memories/{memoryId} {
-      allow get, list: if true;
+      allow get, list: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
