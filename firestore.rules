@@ -20,6 +20,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
     /**
      * @description Allows a user to read and write their own profile data.
      * @path /users/{userId}
@@ -32,10 +40,6 @@ service cloud.firestore {
      * @principle Enforces document ownership for user profiles.
      */
     match /users/{userId} {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
-
       allow get: if isOwner(userId);
       allow list: if false;
       allow create: if isOwner(userId);
@@ -55,10 +59,6 @@ service cloud.firestore {
      * @principle Allows open collaboration on shared memories.
      */
     match /memories/{memoryId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      
       allow get, list: if true;
       allow create: if isSignedIn();
       allow update: if isSignedIn();
