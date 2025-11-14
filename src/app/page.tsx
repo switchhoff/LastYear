@@ -557,6 +557,11 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     displayDate.setFullYear(memoryDate.getFullYear() + 1);
     fetchContent(displayDate);
     setIsViewingHistorical(true);
+
+    // Mark chat as read when selecting from history
+    if (user && firestore) {
+        markChatAsRead(firestore, user, memoryDate);
+    }
   };
 
   const handleRandomSelect = () => {
