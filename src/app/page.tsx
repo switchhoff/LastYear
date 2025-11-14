@@ -246,36 +246,48 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   const historicalSentences = useMemo((): HistoricalEntryWithReactions[] => {
     if (!memories || !user) return [];
     
-    return memories.map(memory => {
-        const dateParts = memory.id.split('-').map(Number);
-        const memoryDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
-        memoryDate.setHours(0,0,0,0);
-        
-        const sentence = (memory.userSentences && Object.values(memory.userSentences)[0]) || "No sentence found.";
-        
-        const lastReadTimestamp = memory.lastRead?.[user.uid] as Timestamp | undefined;
-        let unreadCount = 0;
-        if (memory.chatMessages && memory.chatMessages.length > 0) {
-            if (lastReadTimestamp) {
-                unreadCount = memory.chatMessages.filter(
-                    msg => msg.timestamp && ((msg.timestamp as Timestamp).toMillis() > lastReadTimestamp.toMillis()) && msg.userId !== user.uid
-                ).length;
-            } else {
-                // If lastRead is not set, all messages from others are unread.
-                unreadCount = memory.chatMessages.filter(msg => msg.userId !== user.uid).length;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return memories
+        .map(memory => {
+            const dateParts = memory.id.split('-').map(Number);
+            const memoryDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+            memoryDate.setHours(0, 0, 0, 0);
+
+            const displayDate = new Date(memoryDate);
+            displayDate.setFullYear(displayDate.getFullYear() + 1);
+
+            if (displayDate > today) {
+                return null;
             }
-        }
+            
+            const sentence = (memory.userSentences && Object.values(memory.userSentences)[0]) || "No sentence found.";
+            
+            const lastReadTimestamp = memory.lastRead?.[user.uid] as Timestamp | undefined;
+            let unreadCount = 0;
+            if (memory.chatMessages && memory.chatMessages.length > 0) {
+                if (lastReadTimestamp) {
+                    unreadCount = memory.chatMessages.filter(
+                        msg => msg.timestamp && ((msg.timestamp as Timestamp).toMillis() > lastReadTimestamp.toMillis()) && msg.userId !== user.uid
+                    ).length;
+                } else {
+                    unreadCount = memory.chatMessages.filter(msg => msg.userId !== user.uid).length;
+                }
+            }
 
-        return {
-            date: memoryDate,
-            sentence,
-            reactions: memory.reactions || [],
-            chatMessages: memory.chatMessages || [],
-            unreadCount: unreadCount
-        };
-    }).sort((a, b) => b.date.getTime() - a.date.getTime());
+            return {
+                date: memoryDate,
+                sentence,
+                reactions: memory.reactions || [],
+                chatMessages: memory.chatMessages || [],
+                unreadCount: unreadCount
+            };
+        })
+        .filter((entry): entry is HistoricalEntryWithReactions => entry !== null)
+        .sort((a, b) => b.date.getTime() - a.date.getTime());
 
-  }, [memories, user]);
+}, [memories, user]);
 
 
   useEffect(() => {
@@ -703,9 +715,11 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
             )}
           >
             {isViewingHistorical && (
-                <Button variant="link" onClick={fetchTodaysContent} className="mb-2 h-auto p-0">
-                  Back to today...
-                </Button>
+                <div className="mb-2">
+                    <Button variant="link" onClick={fetchTodaysContent} className="h-auto p-0">
+                        Back to today...
+                    </Button>
+                </div>
             )}
             <div className="flex flex-col gap-1 mb-4 items-center text-center">
               <div className="flex items-center justify-center gap-2 flex-wrap">
