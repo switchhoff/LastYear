@@ -153,37 +153,32 @@ export function addChatMessage(
 
   const memoryId = getMemoryDocId(new Date(memoryDate));
   const memoryRef = doc(firestore, 'memories', memoryId);
-  const userDocRef = doc(firestore, 'users', user.uid);
 
-  getDoc(userDocRef).then(userDocSnap => {
-    const userName = userDocSnap.exists() ? userDocSnap.data().userName : (user.displayName || 'Anonymous');
+  // Get username directly from the user object, not from another DB read.
+  const userName = user.displayName || 'Anonymous';
 
-    const newMessage: UserMemoryChatMessage = {
-      userId: user.uid,
-      userName: userName,
-      text: text,
-      timestamp: serverTimestamp(),
-    };
-    
-    const dataToUpdate = {
-      chatMessages: arrayUnion(newMessage)
-    };
+  const newMessage: UserMemoryChatMessage = {
+    userId: user.uid,
+    userName: userName,
+    text: text,
+    timestamp: serverTimestamp(),
+  };
+  
+  const dataToUpdate = {
+    chatMessages: arrayUnion(newMessage)
+  };
 
-    updateDoc(memoryRef, dataToUpdate)
-    .catch(error => {
-      const contextualError = new FirestorePermissionError({
-        operation: 'update',
-        path: memoryRef.path,
-        requestResourceData: { chatMessages: `arrayUnion(${JSON.stringify(newMessage)})`}
-      });
-      errorEmitter.emit('permission-error', contextualError);
+  // Directly update the document without fetching the user profile first.
+  updateDoc(memoryRef, dataToUpdate)
+  .catch(error => {
+    const contextualError = new FirestorePermissionError({
+      operation: 'update',
+      path: memoryRef.path,
+      // Note: arrayUnion is a transformation, so the raw data isn't perfectly representable,
+      // but we can give a hint.
+      requestResourceData: { chatMessages: `arrayUnion(${JSON.stringify(newMessage)})`}
     });
-  }).catch(error => {
-      const contextualError = new FirestorePermissionError({
-        operation: 'get',
-        path: userDocRef.path,
-      });
-      errorEmitter.emit('permission-error', contextualError);
+    errorEmitter.emit('permission-error', contextualError);
   });
 }
 
