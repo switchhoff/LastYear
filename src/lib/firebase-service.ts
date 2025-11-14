@@ -69,15 +69,15 @@ export function saveUserSentence(
         });
     } else {
         // Document doesn't exist, create it with all fields
-        const createData = {
+        const createData: Memory = {
             id: memoryId,
             date: date.toISOString().split('T')[0],
             userSentences: {
                 [user.uid]: sentence,
             },
             reactions: [],
-            chatMessages: [],
-            lastRead: {},
+            chatMessages: [], // Ensure this is initialized
+            lastRead: {},      // Ensure this is initialized
         }
         setDoc(memoryRef, createData)
             .catch(setError => {

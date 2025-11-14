@@ -248,12 +248,13 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
         
         const lastReadTimestamp = memory.lastRead?.[user.uid] as Timestamp | undefined;
         let unreadCount = 0;
-        if (memory.chatMessages) {
+        if (memory.chatMessages && memory.chatMessages.length > 0) {
             if (lastReadTimestamp) {
                 unreadCount = memory.chatMessages.filter(
                     msg => msg.timestamp && (msg.timestamp as unknown as Timestamp).toMillis() > lastReadTimestamp.toMillis() && msg.userId !== user.uid
                 ).length;
             } else {
+                // If lastRead is not set, all messages from others are unread.
                 unreadCount = memory.chatMessages.filter(msg => msg.userId !== user.uid).length;
             }
         }
@@ -374,13 +375,17 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
   }, [memoryData]);
   
   const unreadMessagesCount = useMemo(() => {
-      if (!memoryData || !user || !memoryData.chatMessages) return 0;
+      if (!memoryData || !user || !memoryData.chatMessages || memoryData.chatMessages.length === 0) return 0;
+      
       const lastReadTimestamp = memoryData.lastRead?.[user.uid] as Timestamp | undefined;
+      
       if (lastReadTimestamp) {
         return memoryData.chatMessages.filter(
           msg => msg.timestamp && (msg.timestamp as unknown as Timestamp).toMillis() > lastReadTimestamp.toMillis() && msg.userId !== user.uid
         ).length;
       }
+      
+      // If no lastRead timestamp, all messages from others are unread.
       return memoryData.chatMessages.filter(msg => msg.userId !== user.uid).length;
   }, [memoryData, user]);
 
