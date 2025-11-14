@@ -57,6 +57,11 @@
             "type": "object",
             "description": "An object mapping user IDs to the timestamp of their last read.",
             "properties": {}
+        },
+        "lastMessageTimestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The server timestamp of the last chat message added."
         }
       },
       "required": ["id", "date"]
@@ -97,7 +102,7 @@
         "timestamp": {
             "type": "string",
             "format": "date-time",
-            "description": "The server timestamp when the message was created."
+            "description": "The client-side timestamp when the message was created."
         }
       },
       "required": ["userId", "text", "userName", "timestamp"]

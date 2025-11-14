@@ -6,6 +6,7 @@ import {
   arrayUnion,
   serverTimestamp,
   FieldValue,
+  Timestamp,
   type Firestore,
 } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
@@ -20,7 +21,7 @@ export type UserMemoryChatMessage = {
   userId: string;
   userName: string;
   text: string;
-  timestamp: FieldValue;
+  timestamp: Date | Timestamp; // Can be a JS Date on client and Firestore Timestamp from server
 };
 
 export type Memory = {
@@ -30,6 +31,7 @@ export type Memory = {
     reactions: UserReaction[];
     chatMessages?: UserMemoryChatMessage[];
     lastRead?: { [key: string]: FieldValue };
+    lastMessageTimestamp?: FieldValue;
 }
 
 export const getMemoryDocId = (date: Date): string => {
@@ -154,29 +156,28 @@ export function addChatMessage(
   const memoryId = getMemoryDocId(new Date(memoryDate));
   const memoryRef = doc(firestore, 'memories', memoryId);
 
-  // Get username directly from the user object, not from another DB read.
   const userName = user.displayName || 'Anonymous';
 
-  const newMessage: UserMemoryChatMessage = {
+  const newMessage = {
     userId: user.uid,
     userName: userName,
     text: text,
-    timestamp: serverTimestamp(),
+    // Use a client-side JS Date object for the array.
+    timestamp: new Date(), 
   };
   
+  // Use serverTimestamp() on a separate top-level field.
   const dataToUpdate = {
-    chatMessages: arrayUnion(newMessage)
+    chatMessages: arrayUnion(newMessage),
+    lastMessageTimestamp: serverTimestamp()
   };
 
-  // Directly update the document without fetching the user profile first.
   updateDoc(memoryRef, dataToUpdate)
   .catch(error => {
     const contextualError = new FirestorePermissionError({
       operation: 'update',
       path: memoryRef.path,
-      // Note: arrayUnion is a transformation, so the raw data isn't perfectly representable,
-      // but we can give a hint.
-      requestResourceData: { chatMessages: `arrayUnion(${JSON.stringify(newMessage)})`}
+      requestResourceData: dataToUpdate
     });
     errorEmitter.emit('permission-error', contextualError);
   });

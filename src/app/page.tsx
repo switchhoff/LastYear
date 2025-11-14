@@ -153,7 +153,14 @@ function ChatSection({ content, memoryData }: { content: DailyContent, memoryDat
   const [isSending, setIsSending] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  const messages = useMemo(() => memoryData?.chatMessages || [], [memoryData]);
+  const messages = useMemo(() => {
+    if (!memoryData?.chatMessages) return [];
+    return [...memoryData.chatMessages].sort((a, b) => {
+        const timeA = a.timestamp instanceof Timestamp ? a.timestamp.toMillis() : new Date(a.timestamp).getTime();
+        const timeB = b.timestamp instanceof Timestamp ? b.timestamp.toMillis() : new Date(b.timestamp).getTime();
+        return timeA - timeB;
+    });
+  }, [memoryData]);
   
   useEffect(() => {
     const viewport = scrollAreaRef.current?.querySelector<HTMLDivElement>('[data-radix-scroll-area-viewport]');
@@ -251,7 +258,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
         if (memory.chatMessages && memory.chatMessages.length > 0) {
             if (lastReadTimestamp) {
                 unreadCount = memory.chatMessages.filter(
-                    msg => msg.timestamp && (msg.timestamp as unknown as Timestamp).toMillis() > lastReadTimestamp.toMillis() && msg.userId !== user.uid
+                    msg => msg.timestamp && ((msg.timestamp as Timestamp).toMillis() > lastReadTimestamp.toMillis()) && msg.userId !== user.uid
                 ).length;
             } else {
                 // If lastRead is not set, all messages from others are unread.
@@ -381,7 +388,11 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
       
       if (lastReadTimestamp) {
         return memoryData.chatMessages.filter(
-          msg => msg.timestamp && (msg.timestamp as unknown as Timestamp).toMillis() > lastReadTimestamp.toMillis() && msg.userId !== user.uid
+          msg => {
+              if (!msg.timestamp) return false;
+              const msgTime = msg.timestamp instanceof Timestamp ? msg.timestamp.toMillis() : new Date(msg.timestamp).getTime();
+              return msgTime > lastReadTimestamp.toMillis() && msg.userId !== user.uid;
+          }
         ).length;
       }
       
