@@ -77,6 +77,7 @@ function HistoricalEntry({
 }) {
   const alexReaction = useMemo(() => entry.reactions.find(r => r.userId === ALEX_USER_ID)?.reaction, [entry.reactions]);
   const amalieReaction = useMemo(() => entry.reactions.find(r => r.userId === AMALIE_USER_ID)?.reaction, [entry.reactions]);
+  const totalMessageCount = entry.chatMessages.length;
 
   const displayDate = new Date(entry.date);
   displayDate.setFullYear(displayDate.getFullYear() + 1);
@@ -114,16 +115,16 @@ function HistoricalEntry({
         {amalieReaction || <span className="text-muted-foreground/50">-</span>}
       </div>
        <div className="col-span-1 flex justify-center">
-        {entry.unreadCount > 0 && (
-          <div className="relative">
-            <MessageSquare className="h-6 w-6 text-primary" />
-            <Badge variant="destructive" className="absolute -top-2 -right-3 px-1.5 h-5 min-w-[20px] flex items-center justify-center">
-              {entry.unreadCount > 9 ? '9+' : entry.unreadCount}
-            </Badge>
-          </div>
-        )}
-         {entry.unreadCount === 0 && entry.chatMessages.length > 0 && (
-            <MessageSquare className="h-6 w-6 text-muted-foreground" />
+        {totalMessageCount > 0 && (
+            <div className="relative">
+                <MessageSquare className="h-6 w-6 text-muted-foreground" />
+                <Badge
+                    variant={entry.unreadCount > 0 ? 'destructive' : 'secondary'}
+                    className="absolute -top-2 -right-3 px-1.5 h-5 min-w-[20px] flex items-center justify-center"
+                >
+                    {totalMessageCount > 9 ? '9+' : totalMessageCount}
+                </Badge>
+            </div>
         )}
       </div>
     </div>
@@ -393,23 +394,29 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
     return null;
   }, [memoryData]);
   
-  const unreadMessagesCount = useMemo(() => {
-      if (!memoryData || !user || !memoryData.chatMessages || memoryData.chatMessages.length === 0) return 0;
+  const { unreadCount, totalMessageCount } = useMemo(() => {
+      if (!memoryData || !user || !memoryData.chatMessages || memoryData.chatMessages.length === 0) {
+          return { unreadCount: 0, totalMessageCount: 0 };
+      }
       
+      const totalMessages = memoryData.chatMessages.length;
       const lastReadTimestamp = memoryData.lastRead?.[user.uid] as Timestamp | undefined;
       
+      let unread = 0;
       if (lastReadTimestamp) {
-        return memoryData.chatMessages.filter(
+        unread = memoryData.chatMessages.filter(
           msg => {
               if (!msg.timestamp) return false;
               const msgTime = msg.timestamp instanceof Timestamp ? msg.timestamp.toMillis() : new Date(msg.timestamp).getTime();
               return msgTime > lastReadTimestamp.toMillis() && msg.userId !== user.uid;
           }
         ).length;
+      } else {
+        // If no lastRead timestamp, all messages from others are unread.
+        unread = memoryData.chatMessages.filter(msg => msg.userId !== user.uid).length;
       }
-      
-      // If no lastRead timestamp, all messages from others are unread.
-      return memoryData.chatMessages.filter(msg => msg.userId !== user.uid).length;
+
+      return { unreadCount: unread, totalMessageCount: totalMessages };
   }, [memoryData, user]);
 
 
@@ -687,9 +694,11 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
 
           <Button variant="ghost" size="icon" className="h-10 w-10 relative" onClick={handleToggleChat}>
             <MessageSquare className="h-6 w-6" />
-            {unreadMessagesCount > 0 && (
-                <Badge variant="destructive" className="absolute -top-1 -right-1 px-1.5 h-5 min-w-[20px] flex items-center justify-center">
-                    {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
+            {totalMessageCount > 0 && (
+                <Badge 
+                    variant={unreadCount > 0 ? 'destructive' : 'secondary'}
+                    className="absolute -top-1 -right-1 px-1.5 h-5 min-w-[20px] flex items-center justify-center">
+                    {totalMessageCount > 9 ? '9+' : totalMessageCount}
                 </Badge>
             )}
             <span className="sr-only">Toggle Chat</span>
