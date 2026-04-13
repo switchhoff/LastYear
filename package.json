@@ -4,7 +4,7 @@
   "private": true,
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/switchhoff/LastYear.git"
+    "url": "https://github.com/switchhoff/LastYear.git"
   },
   "scripts": {
     "dev": "next dev --turbopack -p 9002",
