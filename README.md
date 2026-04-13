@@ -10,6 +10,9 @@ Connected to: [https://github.com/switchhoff/LastYear.git](https://github.com/sw
 To finalize the connection to your GitHub repository and push your code, run the following commands in your terminal:
 
 ```bash
+# Remove the existing remote if it exists
+git remote remove origin
+
 # Add the remote repository using HTTPS
 git remote add origin https://github.com/switchhoff/LastYear.git
 
