@@ -1,21 +1,24 @@
 {
-  "name": "Year Ago Today",
-  "short_name": "Year Ago",
-  "description": "A nostalgic reminder of fun events that happened exactly one year ago.",
+  "name": "Last Year",
+  "short_name": "Last Year",
+  "description": "Relive what happened one year ago today — memories shared between two people.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#2563eb",
+  "background_color": "#FDFAF5",
+  "theme_color": "#1e2a4a",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "/icon-192x192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/icon-512x512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
