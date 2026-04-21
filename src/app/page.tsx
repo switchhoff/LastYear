@@ -648,12 +648,13 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
 
                     {/* Reaction badges — top right */}
                     <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
-                      {alexReaction && (
+                      {/* Show other user's reaction as a badge; own reaction lives in the button only */}
+                      {user?.uid !== ALEX_USER_ID && alexReaction && (
                         <span className="text-xl bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 shadow-sm">
                           {alexReaction}
                         </span>
                       )}
-                      {amalieReaction && (
+                      {user?.uid !== AMALIE_USER_ID && amalieReaction && (
                         <span className="text-xl bg-rose-50 border border-rose-200 rounded-full px-2 py-0.5 shadow-sm">
                           {amalieReaction}
                         </span>
@@ -664,14 +665,14 @@ function MainContent({ historicalSentences }: { historicalSentences: HistoricalE
                             variant="outline"
                             size="icon"
                             className={cn(
-                              'h-8 w-8 rounded-full border-border/60 bg-background hover:bg-muted shadow-sm',
+                              'h-9 w-9 rounded-full border-border/60 bg-background hover:bg-muted shadow-sm text-lg',
                               userReaction && 'border-accent/40 bg-accent/5'
                             )}
                             disabled={isSending || !user}
                           >
                             {userReaction
-                              ? <span className="text-base">{userReaction}</span>
-                              : <PlusCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                              ? <span>{userReaction}</span>
+                              : <PlusCircle className="h-4 w-4 text-muted-foreground" />
                             }
                           </Button>
                         </PopoverTrigger>
