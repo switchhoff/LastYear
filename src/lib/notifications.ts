@@ -32,17 +32,8 @@ export async function initNotifications(userId: string): Promise<void> {
       await storeFcmToken(userId, token);
     }
 
-    // Handle foreground messages
-    onMessage(messaging, (payload) => {
-      const title = payload.notification?.title || 'Last Year';
-      const body = payload.notification?.body || '';
-      if (Notification.permission === 'granted') {
-        new Notification(title, {
-          body,
-          icon: '/icon-192x192.png',
-        });
-      }
-    });
+    // Foreground messages: app is open so user sees changes in real-time — no duplicate notification needed
+    onMessage(messaging, () => {});
   } catch (err) {
     console.error('[notifications] Failed to get FCM token:', err);
   }
