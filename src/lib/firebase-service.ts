@@ -1,7 +1,6 @@
 import {
   doc,
   setDoc,
-  getDoc,
   updateDoc,
   arrayUnion,
   serverTimestamp,
@@ -53,48 +52,19 @@ export function saveUserSentence(
   const memoryId = getMemoryDocId(date);
   const memoryRef = doc(firestore, 'memories', memoryId);
 
-  const dataToUpdate = {
+  // setDoc with merge:true creates the doc if missing or patches it if it exists —
+  // avoids the TOCTOU race of getDoc → conditional setDoc/updateDoc.
+  const data = {
+    id: memoryId,
+    date: date.toISOString().split('T')[0],
     [`userSentences.${user.uid}`]: sentence,
   };
 
-  getDoc(memoryRef).then(docSnap => {
-    if (docSnap.exists()) {
-        // Document exists, just update the sentence
-        updateDoc(memoryRef, dataToUpdate)
-        .catch((error) => {
-             const contextualError = new FirestorePermissionError({
-                operation: 'update',
-                path: memoryRef.path,
-                requestResourceData: dataToUpdate
-            });
-            errorEmitter.emit('permission-error', contextualError);
-        });
-    } else {
-        // Document doesn't exist, create it with all fields
-        const createData: Memory = {
-            id: memoryId,
-            date: date.toISOString().split('T')[0],
-            userSentences: {
-                [user.uid]: sentence,
-            },
-            reactions: [],
-            chatMessages: [], // Ensure this is initialized
-            lastRead: {},      // Ensure this is initialized
-        }
-        setDoc(memoryRef, createData)
-            .catch(setError => {
-                 const contextualError = new FirestorePermissionError({
-                    operation: 'create',
-                    path: memoryRef.path,
-                    requestResourceData: createData
-                });
-                errorEmitter.emit('permission-error', contextualError);
-            })
-    }
-  }).catch(error => {
-     const contextualError = new FirestorePermissionError({
-        operation: 'get',
-        path: memoryRef.path,
+  setDoc(memoryRef, data, { merge: true }).catch(() => {
+    const contextualError = new FirestorePermissionError({
+      operation: 'update',
+      path: memoryRef.path,
+      requestResourceData: data,
     });
     errorEmitter.emit('permission-error', contextualError);
   });
