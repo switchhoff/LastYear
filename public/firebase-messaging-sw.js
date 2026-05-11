@@ -12,20 +12,20 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Handle FCM push messages when app is in background / closed
+// Handle FCM push messages when app is backgrounded or closed
 messaging.onBackgroundMessage((payload) => {
   const title = payload.notification?.title || 'Last Year';
   const body = payload.notification?.body || 'Something new happened.';
   self.registration.showNotification(title, {
     body,
-    icon: '/icon-192x192.png',
-    badge: '/icon-192x192.png',
+    icon: '/lastyear.png',
+    badge: '/lastyear.png',
     data: { url: payload.data?.url || '/' },
     vibrate: [100, 50, 100],
   });
 });
 
-// Open the app when a notification is clicked
+// Focus or open app when notification is tapped
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const url = event.notification.data?.url || '/';
@@ -39,30 +39,4 @@ self.addEventListener('notificationclick', (event) => {
       if (clients.openWindow) return clients.openWindow(url);
     })
   );
-});
-
-// Schedule a daily 8am "check your memory" notification
-function scheduleMorningNotification() {
-  const now = new Date();
-  const next8am = new Date();
-  next8am.setHours(8, 0, 0, 0);
-  if (now >= next8am) {
-    next8am.setDate(next8am.getDate() + 1);
-  }
-  const msUntil8am = next8am.getTime() - now.getTime();
-
-  setTimeout(() => {
-    self.registration.showNotification('Good morning ☀️', {
-      body: 'See what happened one year ago today...',
-      icon: '/icon-192x192.png',
-      badge: '/icon-192x192.png',
-      data: { url: '/' },
-      vibrate: [100, 50, 100],
-    });
-    scheduleMorningNotification();
-  }, msUntil8am);
-}
-
-self.addEventListener('activate', () => {
-  scheduleMorningNotification();
 });
